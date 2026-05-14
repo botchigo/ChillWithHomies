@@ -33,13 +33,14 @@ export default function ForgotPasswordScreen() {
         >
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
-              <Pressable onPress={() => router.back()} style={styles.backBtn}>
-                <FontAwesome name='chevron-left' size={24} color='#ffb233' />
+              <Pressable onPress={() => router.back()} style={styles.backBtnWrapper}>
+                <FontAwesome name='chevron-left' size={20} color='#ffb233' />
+                <ThemedText style={styles.backLabel}>Back</ThemedText>
               </Pressable>
               <ThemedText type="title" style={[styles.title, styles.titleBrand]}>
                 Forgot Password
               </ThemedText>
-              <View style={styles.backBtn} />
+              <View style={styles.backBtnWrapper} />
             </View>
 
             <View style={styles.form}>
@@ -47,12 +48,12 @@ export default function ForgotPasswordScreen() {
                 Enter your email or phone number and we'll send you instructions to reset your password.
               </ThemedText>
 
-              <View style={{ height: 20 }} />
+              <View style={{ height: 12 }} />
 
               <TextInput
                 style={styles.input}
                 placeholder='Email or Phone'
-                placeholderTextColor='#9aa0a6'
+                placeholderTextColor='#6b7280'
                 value={email}
                 onChangeText={setEmail}
                 editable={true}
@@ -89,20 +90,26 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
-    paddingTop: 20,
-    flexGrow: 1,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 28,
+    marginBottom: 48,
   },
-  backBtn: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
+  backBtnWrapper: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  backLabel: {
+    color: '#ffb233',
+    fontSize: 14,
+    fontWeight: '500',
   },
   title: {
     flex: 1,
@@ -117,10 +124,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   description: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6b7280',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
   },
   input: {
     width: '100%',
@@ -128,8 +135,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 30,
     backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e6e6e6',
+    borderWidth: 1.2,
+    borderColor: '#d1d5db',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -137,18 +144,18 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   sendButton: {
-    marginTop: 28,
+    marginTop: 20,
     width: '100%',
-    borderRadius: 30,
-    paddingVertical: 14,
+    borderRadius: 28,
+    paddingVertical: 12,
     backgroundColor: '#ffb233',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#ffb233',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 3,
   },
   sendText: {
     color: '#fff',
@@ -158,7 +165,7 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 32,
     justifyContent: 'center',
   },
   footerText: {
