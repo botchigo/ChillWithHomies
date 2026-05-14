@@ -1,0 +1,171 @@
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FontAwesome } from '@expo/vector-icons';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { useRouter } from 'expo-router';
+
+export default function ForgotPasswordScreen() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+
+  function onSendReset() {
+    // placeholder: handle password reset email
+    console.log('send reset email to', { email });
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <View style={styles.header}>
+              <Pressable onPress={() => router.back()} style={styles.backBtn}>
+                <FontAwesome name='chevron-left' size={24} color='#ffb233' />
+              </Pressable>
+              <ThemedText type="title" style={[styles.title, styles.titleBrand]}>
+                Forgot Password
+              </ThemedText>
+              <View style={styles.backBtn} />
+            </View>
+
+            <View style={styles.form}>
+              <ThemedText style={styles.description}>
+                Enter your email or username and we'll send you instructions to reset your password.
+              </ThemedText>
+
+              <View style={{ height: 20 }} />
+
+              <TextInput
+                style={styles.input}
+                placeholder='Email or Username'
+                placeholderTextColor='#9aa0a6'
+                value={email}
+                onChangeText={setEmail}
+                editable={true}
+              />
+
+              <TouchableOpacity activeOpacity={0.9} style={styles.sendButton} onPress={onSendReset}>
+                <ThemedText style={styles.sendText}>SEND RESET LINK</ThemedText>
+              </TouchableOpacity>
+
+              <View style={styles.footerRow}>
+                <ThemedText style={styles.footerText}>Remember your password?</ThemedText>
+                <Pressable onPress={() => router.push('/signin')}>
+                  <ThemedText style={styles.link}> Sign In</ThemedText>
+                </Pressable>
+              </View>
+
+              <View style={styles.footerRow}>
+                <ThemedText style={styles.footerText}>Don't have an account?</ThemedText>
+                <Pressable onPress={() => router.push('/signup')}>
+                  <ThemedText style={styles.link}> Sign Up</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    flexGrow: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 24,
+  },
+  titleBrand: {
+    color: '#ffb233',
+  },
+  form: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  description: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  input: {
+    width: '100%',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 30,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e6e6e6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  sendButton: {
+    marginTop: 28,
+    width: '100%',
+    borderRadius: 30,
+    paddingVertical: 14,
+    backgroundColor: '#ffb233',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ffb233',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  sendText: {
+    color: '#fff',
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    justifyContent: 'center',
+  },
+  footerText: {
+    color: '#6b7280',
+  },
+  link: {
+    color: '#ffb233',
+    fontWeight: '600',
+  },
+});
