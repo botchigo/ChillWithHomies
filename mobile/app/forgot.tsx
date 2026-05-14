@@ -44,14 +44,14 @@ export default function ForgotPasswordScreen() {
 
             <View style={styles.form}>
               <ThemedText style={styles.description}>
-                Enter your email or username and we'll send you instructions to reset your password.
+                Enter your email or phone number and we'll send you instructions to reset your password.
               </ThemedText>
 
               <View style={{ height: 20 }} />
 
               <TextInput
                 style={styles.input}
-                placeholder='Email or Username'
+                placeholder='Email or Phone'
                 placeholderTextColor='#9aa0a6'
                 value={email}
                 onChangeText={setEmail}
