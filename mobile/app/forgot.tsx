@@ -22,6 +22,8 @@ export default function ForgotPasswordScreen() {
   function onSendReset() {
     // placeholder: handle password reset email
     console.log('send reset email to', { email });
+    // Navigate to OTP verification screen
+    router.push('/otp-verify');
   }
 
   return (
@@ -40,7 +42,7 @@ export default function ForgotPasswordScreen() {
               <ThemedText type="title" style={[styles.title, styles.titleBrand]}>
                 Forgot Password
               </ThemedText>
-              <View style={styles.backBtnWrapper} />
+              <View style={{ width: 70 }} />
             </View>
 
             <View style={styles.form}>
@@ -103,18 +105,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    width: 70,
   },
   backLabel: {
     color: '#ffb233',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
   },
   title: {
     flex: 1,
     textAlign: 'center',
     fontSize: 24,
+    fontWeight: '700',
   },
   titleBrand: {
     color: '#ffb233',

@@ -16,7 +16,16 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="signin" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-info" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-otp" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-kyc-guide" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-id-card" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-nfc-guide" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-liveness" options={{ headerShown: false }} />
+        <Stack.Screen name="signup-review" options={{ headerShown: false }} />
         <Stack.Screen name="forgot" options={{ headerShown: false }} />
+        <Stack.Screen name="otp-verify" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>

@@ -8,8 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -17,14 +18,28 @@ import { useRouter } from 'expo-router';
 
 export default function SignInScreen() {
   const router = useRouter();
-  const [phone, setPhone] = useState('');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  function onSignIn() {
+  async function onSignIn() {
+    if (!emailOrPhone || !password) {
+      return;
+    }
+    
+    setIsLoading(true);
     // placeholder: handle auth
-    console.log('sign in', { phone, password });
+    console.log('sign in', { emailOrPhone, password });
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      // router.push('/(tabs)');
+    }, 2000);
   }
+
+  const isFormValid = emailOrPhone && password && !isLoading;
 
   return (
     <ThemedView style={styles.container}>
@@ -41,16 +56,19 @@ export default function SignInScreen() {
             <View style={styles.form}>
               <TextInput
                 style={styles.input}
-                placeholder='Username'
+                placeholder='Số điện thoại'
                 placeholderTextColor='#9aa0a6'
-                value={phone}
-                onChangeText={setPhone}
+                value={emailOrPhone}
+                onChangeText={setEmailOrPhone}
+                keyboardType='phone-pad'
+                autoCapitalize='none'
+                editable={!isLoading}
               />
 
               <View style={{ height: 12 }} />
 
               <View style={styles.passwordContainer}>
-                <View style={styles.passwordInputWrapper}>
+                <View style={styles.passwordInputWrapper} pointerEvents="box-none">
                   <TextInput
                     style={styles.passwordInput}
                     placeholder='Password'
@@ -58,20 +76,38 @@ export default function SignInScreen() {
                     secureTextEntry={!showPassword}
                     value={password}
                     onChangeText={setPassword}
+                    editable={!isLoading}
                   />
-                  <Pressable onPress={() => setShowPassword(v => !v)} style={styles.showHideBtn}>
-                    <ThemedText style={styles.showHideText}>{showPassword ? 'Hide' : 'Show'}</ThemedText>
-                  </Pressable>
+                  <TouchableOpacity 
+                    onPress={() => setShowPassword(!showPassword)} 
+                    style={styles.showHideBtn}
+                    disabled={isLoading}
+                  >
+                    <FontAwesome 
+                      name={showPassword ? 'eye' : 'eye-slash'} 
+                      size={18} 
+                      color='#6b7280' 
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              <TouchableOpacity activeOpacity={0.9} style={styles.signInButton} onPress={onSignIn}>
-                <ThemedText style={styles.signInText}>SIGN IN</ThemedText>
+              <TouchableOpacity 
+                activeOpacity={0.9} 
+                style={[styles.signInButton, !isFormValid && styles.signInButtonDisabled]} 
+                onPress={onSignIn}
+                disabled={!isFormValid}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size='small' color='#fff' />
+                ) : (
+                  <ThemedText style={styles.signInText}>SIGN IN</ThemedText>
+                )}
               </TouchableOpacity>
 
               <View style={styles.signupRow}>
                 <ThemedText style={styles.noAccount}>Don't have an account?</ThemedText>
-                <Pressable onPress={() => router.push('/signup')}>
+                <Pressable onPress={() => router.push('/signup-info')} disabled={isLoading}>
                   <ThemedText style={styles.signUp}> Sign Up</ThemedText>
                 </Pressable>
               </View>
@@ -83,16 +119,28 @@ export default function SignInScreen() {
               </View>
 
               <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialButton} onPress={() => console.log('fb') }>
+                <TouchableOpacity 
+                  style={styles.socialButton} 
+                  onPress={() => console.log('fb')}
+                  disabled={isLoading}
+                >
                   <FontAwesome name='facebook' size={20} color='#3b5998' />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.socialButton} onPress={() => console.log('google') }>
+                <TouchableOpacity 
+                  style={styles.socialButton} 
+                  onPress={() => console.log('google')}
+                  disabled={isLoading}
+                >
                   <FontAwesome name='google' size={20} color='#DB4437' />
                 </TouchableOpacity>
               </View>
 
-              <Pressable onPress={() => router.push('/forgot')} style={styles.forgotPasswordRow}>
+              <Pressable 
+                onPress={() => router.push('/forgot')} 
+                style={styles.forgotPasswordRow}
+                disabled={isLoading}
+              >
                 <ThemedText style={styles.forgotPasswordText}>Forgot password?</ThemedText>
               </Pressable>
             </View>
@@ -173,11 +221,6 @@ const styles = StyleSheet.create({
     right: 16,
     padding: 8,
   },
-  showHideText: {
-    color: '#6b7280',
-    fontSize: 13,
-    fontWeight: '500',
-  },
   signInButton: {
     marginTop: 22,
     width: '100%',
@@ -191,6 +234,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 16,
     elevation: 4,
+  },
+  signInButtonDisabled: {
+    backgroundColor: '#d1d5db',
+    shadowColor: '#d1d5db',
   },
   signInText: {
     color: '#fff',
