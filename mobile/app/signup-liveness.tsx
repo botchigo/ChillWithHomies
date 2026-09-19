@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
-  Dimensions,
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +13,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 
-const { width, height } = Dimensions.get('window');
 const FACE_FRAME_SIZE = 280;
 
 export default function SignUpLivenessScreen() {
@@ -83,7 +81,7 @@ export default function SignUpLivenessScreen() {
               </View>
               <ThemedText style={styles.successTitle}>Verification Complete!</ThemedText>
               <ThemedText style={styles.successDesc}>
-                Your face verification was successful. You're one step away from completing your registration.
+                Your face verification was successful. You&apos;re one step away from completing your registration.
               </ThemedText>
             </View>
 
@@ -143,7 +141,7 @@ export default function SignUpLivenessScreen() {
                       },
                     ]}
                   >
-                    <FontAwesome name="face-o" size={80} color="#3b82f6" />
+                    <FontAwesome name="smile-o" size={80} color="#3b82f6" />
                   </Animated.View>
                   <ThemedText style={styles.scanningText}>Keep your face in the frame</ThemedText>
                   <View style={styles.progressBar}>
@@ -154,7 +152,7 @@ export default function SignUpLivenessScreen() {
                 <View style={styles.readyContent}>
                   <View style={styles.faceFrame}>
                     <View style={styles.faceFrameBorder} />
-                    <FontAwesome name="face-o" size={80} color="#d1d5db" />
+                    <FontAwesome name="smile-o" size={80} color="#d1d5db" />
                   </View>
                   <ThemedText style={styles.readyText}>Position your face in the oval</ThemedText>
                 </View>

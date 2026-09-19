@@ -1,35 +1,33 @@
+import { FontAwesome } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AppColors, FontFamily } from '@/constants/theme';
+
+const ACTIVE = AppColors.accent;
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarActiveTintColor: ACTIVE,
+        tabBarInactiveTintColor: '#A39282',
+        tabBarLabelStyle: { fontSize: 11, fontFamily: FontFamily.bodySemiBold, marginBottom: 4 },
+        tabBarStyle: {
+          height: 72,
+          paddingTop: 8,
+          backgroundColor: AppColors.surface,
+          borderTopColor: AppColors.border,
+        },
       }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Trang chủ', tabBarIcon: ({ color }) => <FontAwesome name="home" size={21} color={color} /> }} />
+      <Tabs.Screen name="explore" options={{ title: 'Ghép kèo', tabBarIcon: ({ color }) => <FontAwesome name="compass" size={21} color={color} /> }} />
+      <Tabs.Screen name="create" options={{ title: 'Tạo kèo', tabBarIcon: ({ color }) => <FontAwesome name="plus-circle" size={25} color={color} /> }} />
+      <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarIcon: ({ color }) => <FontAwesome name="comments" size={21} color={color} /> }} />
+      <Tabs.Screen name="profile" options={{ title: 'Tôi', tabBarIcon: ({ color }) => <FontAwesome name="user" size={20} color={color} /> }} />
     </Tabs>
   );
 }

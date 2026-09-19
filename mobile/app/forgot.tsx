@@ -21,7 +21,7 @@ export default function ForgotPasswordScreen() {
 
   function onSendReset() {
     // placeholder: handle password reset email
-    console.log('send reset email to', { email });
+    if (!email.trim()) return;
     // Navigate to OTP verification screen
     router.push('/otp-verify');
   }
@@ -47,7 +47,7 @@ export default function ForgotPasswordScreen() {
 
             <View style={styles.form}>
               <ThemedText style={styles.description}>
-                Enter your email or phone number and we'll send you instructions to reset your password.
+                Enter your email or phone number and we&apos;ll send you instructions to reset your password.
               </ThemedText>
 
               <View style={{ height: 12 }} />
@@ -73,8 +73,8 @@ export default function ForgotPasswordScreen() {
               </View>
 
               <View style={styles.footerRow}>
-                <ThemedText style={styles.footerText}>Don't have an account?</ThemedText>
-                <Pressable onPress={() => router.push('/signup')}>
+                <ThemedText style={styles.footerText}>Don&apos;t have an account?</ThemedText>
+                <Pressable onPress={() => router.push('/signup-info')}>
                   <ThemedText style={styles.link}> Sign Up</ThemedText>
                 </Pressable>
               </View>

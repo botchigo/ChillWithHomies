@@ -22,7 +22,7 @@ export default function SignUpOTPScreen() {
   
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timeLeft, setTimeLeft] = useState(60);
-  const [canResend, setCanResend] = useState(false);
+  const canResend = timeLeft === 0;
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -31,8 +31,6 @@ export default function SignUpOTPScreen() {
         setTimeLeft(timeLeft - 1);
       }, 1000);
       return () => clearTimeout(timer);
-    } else {
-      setCanResend(true);
     }
   }, [timeLeft]);
 
@@ -73,13 +71,12 @@ export default function SignUpOTPScreen() {
 
   function onVerifyOTP() {
     const otpCode = otp.join('');
-    console.log('verify otp:', otpCode);
+    if (!/^[0-9]{6}$/.test(otpCode)) return;
     router.push('/signup-kyc-guide');
   }
 
   function onResendOTP() {
     setTimeLeft(60);
-    setCanResend(false);
     setOtp(['', '', '', '', '', '']);
     console.log('resend otp');
   }

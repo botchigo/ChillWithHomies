@@ -34,6 +34,7 @@ export default function SignUpIDCardScreen() {
   }
 
   function onContinueFront() {
+    if (!frontPhoto) return;
     setStep('flipping');
     // Automatically switch to 'back' after 2 seconds
     setTimeout(() => setStep('back'), 2000);
@@ -45,6 +46,7 @@ export default function SignUpIDCardScreen() {
   }
 
   function onContinueBack() {
+    if (!backPhoto) return;
     setStep('review');
   }
 
@@ -60,7 +62,8 @@ export default function SignUpIDCardScreen() {
   }
 
   function onContinue() {
-    router.push('/signup-liveness');
+    if (!frontPhoto || !backPhoto) return;
+    router.push('/signup-nfc-guide');
   }
 
   if (step === 'front_review') {

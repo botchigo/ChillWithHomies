@@ -22,24 +22,24 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [notice, setNotice] = useState('');
 
   async function onSignIn() {
-    if (!emailOrPhone || !password) {
+    if (!emailOrPhone.trim() || !password.trim() || isLoading) {
       return;
     }
-    
+
+    setNotice('');
     setIsLoading(true);
-    // placeholder: handle auth
-    console.log('sign in', { emailOrPhone, password });
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      // router.push('/(tabs)');
-    }, 2000);
+
+    // Preview navigation only; no credentials are authenticated or stored.
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+    setPassword('');
+    setIsLoading(false);
+    router.replace('/(tabs)');
   }
 
-  const isFormValid = emailOrPhone && password && !isLoading;
+  const isFormValid = Boolean(emailOrPhone.trim() && password.trim()) && !isLoading;
 
   return (
     <ThemedView style={styles.container}>
@@ -54,6 +54,9 @@ export default function SignInScreen() {
             </ThemedText>
 
             <View style={styles.form}>
+              <ThemedText style={styles.demoNotice}>
+                Demo only: use sample details to explore. Sign-in, registration and password reset are simulated.
+              </ThemedText>
               <TextInput
                 style={styles.input}
                 placeholder='Số điện thoại'
@@ -76,12 +79,15 @@ export default function SignInScreen() {
                     secureTextEntry={!showPassword}
                     value={password}
                     onChangeText={setPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     editable={!isLoading}
                   />
                   <TouchableOpacity 
                     onPress={() => setShowPassword(!showPassword)} 
                     style={styles.showHideBtn}
                     disabled={isLoading}
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                   >
                     <FontAwesome 
                       name={showPassword ? 'eye' : 'eye-slash'} 
@@ -101,12 +107,12 @@ export default function SignInScreen() {
                 {isLoading ? (
                   <ActivityIndicator size='small' color='#fff' />
                 ) : (
-                  <ThemedText style={styles.signInText}>SIGN IN</ThemedText>
+                  <ThemedText style={styles.signInText}>SIGN IN (DEMO)</ThemedText>
                 )}
               </TouchableOpacity>
 
               <View style={styles.signupRow}>
-                <ThemedText style={styles.noAccount}>Don't have an account?</ThemedText>
+                <ThemedText style={styles.noAccount}>Don&apos;t have an account?</ThemedText>
                 <Pressable onPress={() => router.push('/signup-info')} disabled={isLoading}>
                   <ThemedText style={styles.signUp}> Sign Up</ThemedText>
                 </Pressable>
@@ -121,20 +127,28 @@ export default function SignInScreen() {
               <View style={styles.socialRow}>
                 <TouchableOpacity 
                   style={styles.socialButton} 
-                  onPress={() => console.log('fb')}
+                  onPress={() => setNotice('Facebook sign-in is not available in this demo.')}
                   disabled={isLoading}
+                  accessibilityLabel="Sign in with Facebook"
                 >
                   <FontAwesome name='facebook' size={20} color='#3b5998' />
                 </TouchableOpacity>
 
                 <TouchableOpacity 
                   style={styles.socialButton} 
-                  onPress={() => console.log('google')}
+                  onPress={() => setNotice('Google sign-in is not available in this demo.')}
                   disabled={isLoading}
+                  accessibilityLabel="Sign in with Google"
                 >
                   <FontAwesome name='google' size={20} color='#DB4437' />
                 </TouchableOpacity>
               </View>
+
+              {notice ? (
+                <ThemedText style={styles.demoNotice} accessibilityRole="alert">
+                  {notice}
+                </ThemedText>
+              ) : null}
 
               <Pressable 
                 onPress={() => router.push('/forgot')} 
@@ -142,6 +156,17 @@ export default function SignInScreen() {
                 disabled={isLoading}
               >
                 <ThemedText style={styles.forgotPasswordText}>Forgot password?</ThemedText>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open the Amber design system"
+                onPress={() => router.push('/design-system')}
+                style={({ pressed }) => [styles.designSystemLink, pressed && { opacity: 0.7 }]}
+              >
+                <FontAwesome name="sun-o" size={16} color="#A6530C" />
+                <ThemedText style={styles.designSystemText}>Explore Amber design system</ThemedText>
+                <FontAwesome name="arrow-right" size={13} color="#A6530C" />
               </Pressable>
             </View>
           </ScrollView>
@@ -173,6 +198,12 @@ const styles = StyleSheet.create({
   form: {
     width: '100%',
     alignItems: 'center',
+  },
+  demoNotice: {
+    color: '#6b7280',
+    fontSize: 13,
+    textAlign: 'center',
+    marginVertical: 12,
   },
   label: {
     fontSize: 13,
@@ -302,5 +333,23 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 14,
     fontWeight: '500',
+  },
+  designSystemLink: {
+    minHeight: 48,
+    marginTop: 24,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFF2BF',
+    borderWidth: 1,
+    borderColor: '#F1DFC7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  designSystemText: {
+    color: '#2F241C',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

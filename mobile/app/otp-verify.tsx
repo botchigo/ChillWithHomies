@@ -19,7 +19,7 @@ export default function OTPVerifyScreen() {
   const router = useRouter();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timeLeft, setTimeLeft] = useState(60);
-  const [canResend, setCanResend] = useState(false);
+  const canResend = timeLeft === 0;
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // Countdown timer
@@ -29,8 +29,6 @@ export default function OTPVerifyScreen() {
         setTimeLeft(timeLeft - 1);
       }, 1000);
       return () => clearTimeout(timer);
-    } else {
-      setCanResend(true);
     }
   }, [timeLeft]);
 
@@ -78,7 +76,7 @@ export default function OTPVerifyScreen() {
 
   function onVerifyOTP() {
     const otpCode = otp.join('');
-    console.log('verify otp:', otpCode);
+    if (!/^[0-9]{6}$/.test(otpCode)) return;
     // Placeholder: verify OTP code
     
     // After successful OTP verification, redirect to reset password screen
@@ -88,7 +86,6 @@ export default function OTPVerifyScreen() {
   function onResendOTP() {
     // Reset timer and allow resending
     setTimeLeft(60);
-    setCanResend(false);
     setOtp(['', '', '', '', '', '']);
     console.log('resend otp');
     // Placeholder: resend OTP code

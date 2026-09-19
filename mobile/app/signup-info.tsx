@@ -70,7 +70,6 @@ export default function SignUpInfoScreen() {
       return;
     }
 
-    console.log('sign up info:', { fullName, email, phone, password });
     // Navigate to OTP verification with phone number
     router.push({
       pathname: '/signup-otp',

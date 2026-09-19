@@ -5,15 +5,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Pressable,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
-
-const { height } = Dimensions.get('window');
 
 export default function SignUpNFCGuideScreen() {
   const router = useRouter();
@@ -54,7 +51,7 @@ export default function SignUpNFCGuideScreen() {
               <FontAwesome name="exclamation-circle" size={48} color="#ef4444" />
               <ThemedText style={styles.errorTitle}>NFC Not Supported</ThemedText>
               <ThemedText style={styles.errorDesc}>
-                Your device doesn't support NFC scanning. You can skip this step and proceed with face verification.
+                Your device doesn&apos;t support NFC scanning. You can skip this step and proceed with face verification.
               </ThemedText>
             </View>
 

@@ -51,7 +51,6 @@ export default function ResetPasswordScreen() {
       return;
     }
 
-    console.log('update password:', { newPassword, confirmPassword });
     // Placeholder: update password in backend
 
     // After successful update, redirect to signin
