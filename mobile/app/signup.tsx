@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,45 +8,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppInput, Chip, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-
-const DRAFT_KEY = '@chillwithhomies/signup-draft-v1';
-const DEMO_OTP = '123456';
-const INTERESTS = ['Nhậu', 'Bia', 'Quán ốc', 'Rooftop', 'Lẩu nướng', 'Café', 'Board game', 'Karaoke', 'Nhóm nhỏ', 'Networking', 'Chạy bộ', 'Workshop'];
-const VIBES = ['Chill', 'Vui vẻ', 'Nhậu', 'Nhóm nhỏ', 'Làm quen người mới', 'Uống có trách nhiệm'];
-const AVATAR_COLORS = ['#F28C28', '#E88F9C', '#7C9A65', '#668CB8', '#B583A7', '#D07A72'];
-
-type Step = 'account' | 'verify' | 'profile' | 'interests' | 'safety' | 'complete';
-type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken';
-type Draft = {
-  step: Step;
-  phone: string;
-  phoneVerified: boolean;
-  name: string;
-  username: string;
-  dateOfBirth: string;
-  city: string;
-  bio: string;
-  avatarColor: string;
-  avatarUri?: string;
-  interests: string[];
-  preferredVibes: string[];
-  acceptedTerms: boolean;
-  acceptedPrivacy: boolean;
-  notificationsEnabled: boolean;
-};
-
-const initialDraft: Draft = {
-  step: 'account', phone: '', phoneVerified: false, name: '', username: '', dateOfBirth: '', city: 'TP. Hồ Chí Minh', bio: '',
-  avatarColor: AVATAR_COLORS[0], avatarUri: undefined, interests: [], preferredVibes: ['Chill'], acceptedTerms: false, acceptedPrivacy: false, notificationsEnabled: true,
-};
-
-const stepNumber: Record<Exclude<Step, 'complete'>, number> = { account: 1, verify: 2, profile: 3, interests: 4, safety: 5 };
+import { AVATAR_COLORS, createInitialSignupDraft, DEMO_OTP, SIGNUP_INTERESTS, SIGNUP_STEP_NUMBER, SIGNUP_VIBES } from '@/src/features/auth/constants';
+import { useAuth } from '@/src/features/auth/hooks/use-auth';
+import { formatDateOfBirthInput, formatPhone, isUsernameValid, normalizeUsername, validateBasicProfile, validateSignupAccount } from '@/src/features/auth/services/auth-validation';
+import { clearSignupDraft, loadSignupDraft, saveSignupDraft } from '@/src/features/auth/services/signup-draft-storage';
+import type { SignupDraft, SignupStep, UsernameStatus } from '@/src/features/auth/types';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { hydrated, state, completeSignUp, notify } = useDemoApp();
-  const [draft, setDraft] = useState<Draft>(initialDraft);
+  const { hydrated, currentUser, users, completeSignUp, notify } = useAuth();
+  const [draft, setDraft] = useState<SignupDraft>(createInitialSignupDraft);
   const [draftHydrated, setDraftHydrated] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -68,31 +38,21 @@ export default function SignUpScreen() {
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(DRAFT_KEY).then((raw) => {
-      if (!active || !raw) return;
-      const stored = JSON.parse(raw) as Partial<Draft>;
-      const requestedStep: Step = ['account', 'verify', 'profile', 'interests', 'safety'].includes(stored.step ?? '') ? stored.step as Step : 'account';
-      const validStep: Step = !stored.phoneVerified && !['account', 'verify'].includes(requestedStep) ? 'verify' : requestedStep;
-      setDraft({
-        ...initialDraft,
-        ...stored,
-        step: validStep,
-        dateOfBirth: normalizeStoredDateOfBirth(stored.dateOfBirth),
-        interests: Array.isArray(stored.interests) ? stored.interests : [],
-        preferredVibes: Array.isArray(stored.preferredVibes) ? stored.preferredVibes : [],
-      });
-    }).catch(() => undefined).finally(() => { if (active) setDraftHydrated(true); });
+    loadSignupDraft()
+      .then((storedDraft) => { if (active && storedDraft) setDraft(storedDraft); })
+      .catch(() => { if (active) notify('Không thể khôi phục tiến trình đăng ký.'); })
+      .finally(() => { if (active) setDraftHydrated(true); });
     return () => { active = false; };
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     if (!draftHydrated || draft.step === 'complete') return;
-    AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => notify('Không thể lưu tiến trình đăng ký trên thiết bị này.'));
+    saveSignupDraft(draft).catch(() => notify('Không thể lưu tiến trình đăng ký trên thiết bị này.'));
   }, [draft, draftHydrated, notify]);
 
   useEffect(() => {
-    if (hydrated && draftHydrated && state.currentUser && !completionInProgress) router.replace('/');
-  }, [completionInProgress, draftHydrated, hydrated, router, state.currentUser]);
+    if (hydrated && draftHydrated && currentUser && !completionInProgress) router.replace('/');
+  }, [completionInProgress, currentUser, draftHydrated, hydrated, router]);
 
   useEffect(() => {
     if (draft.step !== 'verify' || countdown <= 0 || draft.phoneVerified) return;
@@ -101,27 +61,27 @@ export default function SignUpScreen() {
   }, [countdown, draft.phoneVerified, draft.step]);
 
   useEffect(() => {
-    const username = cleanUsername(draft.username);
-    if (draft.step !== 'profile' || !usernamePattern(username)) return;
+    const username = normalizeUsername(draft.username);
+    if (draft.step !== 'profile' || !isUsernameValid(username)) return;
     const timer = setTimeout(() => {
-      const taken = state.users.some((user) => user.username.toLowerCase() === username.toLowerCase());
+      const taken = users.some((user) => user.username.toLowerCase() === username.toLowerCase());
       setUsernameCheck({ value: username.toLowerCase(), taken });
     }, 450);
     return () => clearTimeout(timer);
-  }, [draft.step, draft.username, state.users]);
+  }, [draft.step, draft.username, users]);
 
-  const accountErrors = useMemo(() => validateAccount(draft.phone, password, confirmPassword), [confirmPassword, draft.phone, password]);
+  const accountErrors = useMemo(() => validateSignupAccount(draft.phone, password, confirmPassword), [confirmPassword, draft.phone, password]);
   const accountValid = !accountErrors.phone && !accountErrors.password && !accountErrors.confirm;
-  const normalizedUsername = cleanUsername(draft.username).toLowerCase();
-  const usernameStatus: UsernameStatus = draft.step !== 'profile' || !usernamePattern(normalizedUsername)
+  const normalizedUsername = normalizeUsername(draft.username).toLowerCase();
+  const usernameStatus: UsernameStatus = draft.step !== 'profile' || !isUsernameValid(normalizedUsername)
     ? 'idle'
     : usernameCheck?.value !== normalizedUsername
       ? 'checking'
       : usernameCheck.taken ? 'taken' : 'available';
-  const currentStep = draft.step === 'complete' ? 5 : stepNumber[draft.step];
+  const currentStep = draft.step === 'complete' ? 5 : SIGNUP_STEP_NUMBER[draft.step];
 
-  const updateDraft = (values: Partial<Draft>) => setDraft((current) => ({ ...current, ...values }));
-  const setStep = (step: Step) => updateDraft({ step });
+  const updateDraft = (values: Partial<SignupDraft>) => setDraft((current) => ({ ...current, ...values }));
+  const setStep = (step: SignupStep) => updateDraft({ step });
 
   const goBack = () => {
     if (draft.step === 'account') return router.replace('/signin');
@@ -174,7 +134,7 @@ export default function SignUpScreen() {
   };
 
   const continueProfile = () => {
-    const errors = validateProfile(draft, state.users.map((user) => user.username));
+    const errors = validateBasicProfile(draft, users.map((user) => user.username));
     setProfileErrors(errors);
     if (Object.keys(errors).length || usernameStatus === 'checking') return;
     setStep('interests');
@@ -222,13 +182,13 @@ export default function SignUpScreen() {
       if (result.error?.toLowerCase().includes('username')) setStep('profile');
       return;
     }
-    await AsyncStorage.removeItem(DRAFT_KEY).catch(() => undefined);
+    await clearSignupDraft().catch(() => notify('Tài khoản đã tạo nhưng chưa thể xóa bản nháp đăng ký.'));
     setDraft((current) => ({ ...current, step: 'complete' }));
     setCreating(false);
     notify('Tạo tài khoản thành công!');
   };
 
-  if (!hydrated || !draftHydrated || (state.currentUser && !completionInProgress && draft.step !== 'complete')) {
+  if (!hydrated || !draftHydrated || (currentUser && !completionInProgress && draft.step !== 'complete')) {
     return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /><Text style={styles.loadingText}>Đang mở đăng ký...</Text></View>;
   }
 
@@ -258,7 +218,7 @@ export default function SignUpScreen() {
 }
 
 function AccountStep({ draft, updateDraft, password, setPassword, confirmPassword, setConfirmPassword, showPassword, setShowPassword, showConfirm, setShowConfirm, touched, setTouched, errors, valid, onContinue }: {
-  draft: Draft; updateDraft: (values: Partial<Draft>) => void; password: string; setPassword: (value: string) => void; confirmPassword: string; setConfirmPassword: (value: string) => void;
+  draft: SignupDraft; updateDraft: (values: Partial<SignupDraft>) => void; password: string; setPassword: (value: string) => void; confirmPassword: string; setConfirmPassword: (value: string) => void;
   showPassword: boolean; setShowPassword: (value: boolean) => void; showConfirm: boolean; setShowConfirm: (value: boolean) => void;
   touched: { phone: boolean; password: boolean; confirm: boolean }; setTouched: React.Dispatch<React.SetStateAction<{ phone: boolean; password: boolean; confirm: boolean }>>;
   errors: Record<string, string>; valid: boolean; onContinue: () => void;
@@ -288,10 +248,10 @@ function VerifyStep({ phone, verified, otp, refs, error, countdown, loading, onC
   </StepShell>;
 }
 
-function ProfileStep({ draft, updateDraft, errors, setErrors, usernameStatus, onContinue }: { draft: Draft; updateDraft: (values: Partial<Draft>) => void; errors: Record<string, string>; setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>; usernameStatus: UsernameStatus; onContinue: () => void }) {
-  const { notify } = useDemoApp();
+function ProfileStep({ draft, updateDraft, errors, setErrors, usernameStatus, onContinue }: { draft: SignupDraft; updateDraft: (values: Partial<SignupDraft>) => void; errors: Record<string, string>; setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>; usernameStatus: UsernameStatus; onContinue: () => void }) {
+  const { notify } = useAuth();
   const [pickingAvatar, setPickingAvatar] = useState(false);
-  const change = (values: Partial<Draft>, field: string) => { updateDraft(values); setErrors((current) => ({ ...current, [field]: '' })); };
+  const change = (values: Partial<SignupDraft>, field: string) => { updateDraft(values); setErrors((current) => ({ ...current, [field]: '' })); };
   const usernameHint = usernameStatus === 'checking' ? 'Đang kiểm tra username...' : usernameStatus === 'available' ? '✓ Username khả dụng' : undefined;
   const usernameError = errors.username || (usernameStatus === 'taken' ? 'Username này đã được sử dụng.' : undefined);
 
@@ -354,20 +314,20 @@ function ProfileStep({ draft, updateDraft, errors, setErrors, usernameStatus, on
   </StepShell>;
 }
 
-function InterestsStep({ draft, error, onToggleInterest, onToggleVibe, onContinue }: { draft: Draft; error: string; onToggleInterest: (interest: string) => void; onToggleVibe: (vibe: string) => void; onContinue: () => void }) {
+function InterestsStep({ draft, error, onToggleInterest, onToggleVibe, onContinue }: { draft: SignupDraft; error: string; onToggleInterest: (interest: string) => void; onToggleVibe: (vibe: string) => void; onContinue: () => void }) {
   return <StepShell icon="heart" eyebrow="CÁ NHÂN HÓA" title="Bạn thích những kèo nào?" subtitle="Chọn ít nhất 3 sở thích để gợi ý meetup và bạn mới phù hợp hơn.">
     <View style={styles.selectionHeader}><Text style={styles.selectionTitle}>Sở thích</Text><Text style={[styles.selectionCount, draft.interests.length >= 3 && styles.selectionCountDone]}>{draft.interests.length}/3 tối thiểu</Text></View>
-    <View style={styles.chips}>{INTERESTS.map((interest) => <Chip key={interest} label={interest} selected={draft.interests.includes(interest)} onPress={() => onToggleInterest(interest)} />)}</View>
+    <View style={styles.chips}>{SIGNUP_INTERESTS.map((interest) => <Chip key={interest} label={interest} selected={draft.interests.includes(interest)} onPress={() => onToggleInterest(interest)} />)}</View>
     {error ? <Text accessibilityRole="alert" style={styles.errorBox}>{error}</Text> : null}
     <Text style={styles.subheading}>Không khí bạn thích</Text>
     <Text style={styles.sectionHint}>Có thể chọn nhiều hoặc để trống.</Text>
-    <View style={styles.chips}>{VIBES.map((vibe) => <Chip key={vibe} label={vibe} selected={draft.preferredVibes.includes(vibe)} onPress={() => onToggleVibe(vibe)} />)}</View>
+    <View style={styles.chips}>{SIGNUP_VIBES.map((vibe) => <Chip key={vibe} label={vibe} selected={draft.preferredVibes.includes(vibe)} onPress={() => onToggleVibe(vibe)} />)}</View>
     <View style={styles.personalizationNote}><FontAwesome name="magic" size={15} color={AppColors.accent} /><Text style={styles.personalizationText}>Lựa chọn này sẽ cá nhân hóa Home, Explore và gợi ý bạn bè.</Text></View>
     <AppButton label="Tiếp tục" icon="arrow-right" onPress={onContinue} />
   </StepShell>;
 }
 
-function SafetyStep({ draft, updateDraft, attempted, loading, onFinish }: { draft: Draft; updateDraft: (values: Partial<Draft>) => void; attempted: boolean; loading: boolean; onFinish: () => void }) {
+function SafetyStep({ draft, updateDraft, attempted, loading, onFinish }: { draft: SignupDraft; updateDraft: (values: Partial<SignupDraft>) => void; attempted: boolean; loading: boolean; onFinish: () => void }) {
   return <StepShell icon="shield" eyebrow="AN TOÀN & ĐỒNG Ý" title="Cùng giữ cộng đồng thân thiện" subtitle="Bốn nguyên tắc ngắn để mọi meetup đều thoải mái và an toàn.">
     <View style={styles.rules}><Rule icon="handshake-o" title="Tôn trọng người khác" text="Lắng nghe ranh giới và lựa chọn của mỗi người." /><Rule icon="ban" title="Không spam hoặc quấy rối" text="Không ép buộc, công kích hay gửi nội dung không phù hợp." /><Rule icon="flag" title="Báo cáo và chặn khi cần" text="Bạn luôn có công cụ để tự bảo vệ mình." /><Rule icon="lock" title="Giữ kín thông tin nhạy cảm" text="Không đăng số giấy tờ, tài chính hoặc địa chỉ riêng tư." /></View>
     <View style={styles.consents}>
@@ -404,84 +364,6 @@ function Rule({ icon, title, text }: { icon: React.ComponentProps<typeof FontAwe
 
 function Benefit({ icon, text }: { icon: React.ComponentProps<typeof FontAwesome>['name']; text: string }) {
   return <View style={styles.benefit}><View style={styles.benefitIcon}><FontAwesome name={icon} size={11} color={AppColors.success} /></View><Text style={styles.benefitText}>{text}</Text></View>;
-}
-
-function validateAccount(phone: string, password: string, confirm: string) {
-  const errors: Record<string, string> = {};
-  if (!phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại.';
-  else if (!vietnamPhoneValid(phone)) errors.phone = 'Số điện thoại không hợp lệ.';
-  if (!password) errors.password = 'Vui lòng nhập mật khẩu.';
-  else if (password.length < 8) errors.password = 'Mật khẩu phải có ít nhất 8 ký tự.';
-  else if (!/\p{L}/u.test(password) || !/\d/.test(password)) errors.password = 'Mật khẩu cần có ít nhất một chữ và một số.';
-  if (!confirm) errors.confirm = 'Vui lòng xác nhận mật khẩu.';
-  else if (confirm !== password) errors.confirm = 'Mật khẩu xác nhận không khớp.';
-  return errors;
-}
-
-function validateProfile(draft: Draft, usernames: string[]) {
-  const errors: Record<string, string> = {};
-  const username = cleanUsername(draft.username);
-  if (draft.name.trim().length < 2) errors.name = 'Vui lòng nhập họ và tên.';
-  if (!usernamePattern(username)) errors.username = 'Username cần 3–20 chữ, số, dấu chấm hoặc gạch dưới.';
-  else if (usernames.some((value) => value.toLowerCase() === username.toLowerCase())) errors.username = 'Username này đã được sử dụng.';
-  const birthDate = parseDate(draft.dateOfBirth);
-  if (!draft.dateOfBirth.trim()) errors.dateOfBirth = 'Vui lòng nhập ngày sinh.';
-  else if (!birthDate) errors.dateOfBirth = 'Ngày sinh không hợp lệ. Dùng định dạng MM-DD-YYYY.';
-  else {
-    const today = new Date();
-    const adultCutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
-    if (birthDate > today) errors.dateOfBirth = 'Ngày sinh không được ở tương lai.';
-    else if (birthDate > adultCutoff) errors.dateOfBirth = 'Bạn phải đủ 18 tuổi để tham gia.';
-  }
-  if (!draft.city.trim()) errors.city = 'Vui lòng nhập thành phố.';
-  if (draft.bio.length > 160) errors.bio = 'Giới thiệu không được quá 160 ký tự.';
-  return errors;
-}
-
-function vietnamPhoneValid(value: string) {
-  return /^(?:\+84|84|0)(?:3|5|7|8|9)\d{8}$/.test(normalizePhone(value));
-}
-
-function normalizePhone(value: string) {
-  return value.replace(/[\s.-]/g, '');
-}
-
-function formatPhone(value: string) {
-  let digits = normalizePhone(value).replace(/^\+84/, '0').replace(/^84/, '0');
-  if (digits.length === 10) digits = `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-  return digits;
-}
-
-function usernamePattern(value: string) {
-  return /^[a-zA-Z0-9_.]{3,20}$/.test(value);
-}
-
-function cleanUsername(value: string) {
-  return value.trim().replace(/^@/, '');
-}
-
-function parseDate(value: string) {
-  if (!/^\d{2}-\d{2}-\d{4}$/.test(value)) return null;
-  const [month, day, year] = value.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? date : null;
-}
-
-function normalizeStoredDateOfBirth(value?: string) {
-  if (!value) return '';
-  const legacy = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  return legacy ? `${legacy[2]}-${legacy[3]}-${legacy[1]}` : value;
-}
-
-function formatDateOfBirthInput(value: string, previous: string) {
-  const deletingSeparator = value.length < previous.length && previous.endsWith('-') && value === previous.slice(0, -1);
-  if (deletingSeparator) return value.slice(0, -1);
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  if (digits.length < 2) return digits;
-  if (digits.length === 2) return `${digits}-`;
-  if (digits.length < 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
-  if (digits.length === 4) return `${digits.slice(0, 2)}-${digits.slice(2)}-`;
-  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
 }
 
 function initials(name: string) {

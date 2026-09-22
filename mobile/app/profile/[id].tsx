@@ -7,15 +7,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, Badge, BottomSheet, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import { formatDate, type DemoUser } from '@/data/demo-data';
+import { useSocialGraph } from '@/src/features/profile/hooks/use-social-graph';
+import type { DemoUser } from '@/src/features/profile/types';
+import { useSafety } from '@/src/features/safety/hooks/use-safety';
+import { formatDate } from '@/src/shared/utils/formatters';
 
 type Sheet = 'friend-menu' | 'block' | null;
 
 export default function PublicProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
-  const { state, hydrated, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, rejectFriendRequest, unfriendUser, blockUser, notify } = useDemoApp();
+  const { state, hydrated, sendFriendRequest, cancelFriendRequest, acceptFriendRequest, rejectFriendRequest, unfriendUser, notify } = useSocialGraph();
+  const { blockUser } = useSafety();
   const [sheet, setSheet] = useState<Sheet>(null);
   const userId = Array.isArray(params.id) ? params.id[0] : params.id;
   const user = state.users.find((item) => item.id === userId);

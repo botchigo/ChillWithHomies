@@ -16,8 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppInput, Badge, BottomSheet, Chip, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import { formatDate, type DemoUser, type Meetup, type Review } from '@/data/demo-data';
+import { useProfile } from '@/src/features/profile/hooks/use-profile';
+import type { DemoUser, Review } from '@/src/features/profile/types';
+import { useSafety } from '@/src/features/safety/hooks/use-safety';
+import type { Meetup } from '@/src/features/sessions/types';
+import { formatDate } from '@/src/shared/utils/formatters';
 
 const avatar = require('@/assets/images/profile-minh-anh.png');
 const INTERESTS = ['Nhậu', 'Bia', 'Quán ốc', 'Rooftop', 'Lẩu nướng', 'Café', 'Board game', 'Nhóm nhỏ', 'Karaoke', 'Networking'];
@@ -31,11 +34,11 @@ export default function ProfileScreen() {
     updateProfile,
     updateInterests,
     setNotificationsEnabled,
-    unblockUser,
     resetDemoData,
     signOut,
     notify,
-  } = useDemoApp();
+  } = useProfile();
+  const { unblockUser } = useSafety();
   const profile = state.profile;
   const profileInitials = profile.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toUpperCase() || 'B';
   const [sheet, setSheet] = useState<SheetName>(null);

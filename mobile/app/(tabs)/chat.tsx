@@ -6,8 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, Badge } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import { formatMessageTime, type ChatMessage, type Meetup } from '@/data/demo-data';
+import { useChatList } from '@/src/features/chat/hooks/use-chat-list';
+import type { ChatMessage } from '@/src/features/chat/types';
+import type { Meetup } from '@/src/features/sessions/types';
+import { formatMessageTime } from '@/src/shared/utils/formatters';
 
 function messagePreview(message?: ChatMessage) {
   if (!message) return 'Phòng chat đã sẵn sàng.';
@@ -28,7 +30,7 @@ function meetupIcon(meetup: Meetup): React.ComponentProps<typeof FontAwesome>['n
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { state, hydrated, markRoomRead } = useDemoApp();
+  const { state, hydrated, markRoomRead } = useChatList();
   const currentUserId = state.currentUser?.id;
 
   const rooms = useMemo(() => state.chats.flatMap((room) => {

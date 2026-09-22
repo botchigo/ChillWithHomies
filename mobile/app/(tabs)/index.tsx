@@ -1,31 +1,21 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
 import { AppButton, Chip, IconButton } from '@/components/ui/app-primitives';
-import { useDemoApp } from '@/context/demo-app-context';
-import { FILTERS, filterAndSortMeetups, meetupPreferenceScore, visibleMeetupsForUser, type MeetupFilter } from '@/data/demo-data';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
+import { SESSION_FILTERS, type MeetupFilter } from '@/src/features/sessions/constants';
+import { useMeetupDiscovery } from '@/src/features/sessions/hooks/use-meetup-discovery';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { state } = useDemoApp();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<MeetupFilter[]>([]);
-  const unreadNotifications = state.notifications.filter((notification) => !notification.read).length;
-
-  const meetups = useMemo(() => {
-    const results = filterAndSortMeetups(visibleMeetupsForUser(state.meetups, state.currentUser?.id), query, filters, 'Sắp diễn ra');
-    if (query.trim() || filters.length) return results;
-    return results
-      .map((meetup, index) => ({ meetup, index, score: meetupPreferenceScore(meetup, state.profile.interests, state.profile.preferredVibes) }))
-      .sort((a, b) => b.score - a.score || a.index - b.index)
-      .map(({ meetup }) => meetup);
-  }, [filters, query, state.currentUser?.id, state.meetups, state.profile.interests, state.profile.preferredVibes]);
+  const { meetups, unreadNotifications } = useMeetupDiscovery({ query, filters, sort: 'Sắp diễn ra', personalize: true });
 
   const toggleFilter = (filter: MeetupFilter) => {
     setFilters((current) => current.includes(filter)
@@ -61,7 +51,7 @@ export default function HomeScreen() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {FILTERS.slice(1).map((item) => <Chip key={item} label={item} selected={filters.includes(item)} onPress={() => toggleFilter(item)} />)}
+          {SESSION_FILTERS.slice(1).map((item) => <Chip key={item} label={item} selected={filters.includes(item)} onPress={() => toggleFilter(item)} />)}
         </ScrollView>
 
         <Pressable accessibilityRole="button" onPress={openExplore}>

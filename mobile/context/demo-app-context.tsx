@@ -1,24 +1,17 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { calcCampuchiaShares, createSeedState, meetupDateLabel, type ChatMessage, type DemoAppState, type MeetupDraft, type UserProfile } from '@/data/demo-data';
-
-const STORAGE_KEY = '@chillwithhomies/demo-state-v3';
-type Result = { ok: boolean; error?: string };
-type CompleteSignUpInput = {
-  phone: string;
-  name: string;
-  username: string;
-  dateOfBirth: string;
-  city: string;
-  bio: string;
-  avatarColor: string;
-  avatarUri?: string;
-  interests: string[];
-  preferredVibes: string[];
-  notificationsEnabled: boolean;
-};
+import { createSeedState } from '@/data/demo-data';
+import { loadDemoState, saveDemoState } from '@/src/shared/persistence/demo-state-storage';
+import { normalizePhone, normalizeUsername, validateCompleteSignUp, validateSignInCredentials } from '@/src/features/auth/services/auth-validation';
+import type { CompleteSignUpInput } from '@/src/features/auth/types';
+import type { ChatMessage } from '@/src/features/chat/types';
+import type { UserProfile } from '@/src/features/profile/types';
+import { meetupDateLabel, splitBillEqually } from '@/src/features/sessions/services/session-rules';
+import type { MeetupDraft } from '@/src/features/sessions/types';
+import { applyCompletedMeetupReward, applyNoShowPenalty } from '@/src/features/trust/services/trust-score';
+import type { DemoAppState } from '@/src/shared/types/demo-app-state';
+import type { ActionResult } from '@/src/shared/types/result';
 
 type DemoAppContextValue = {
   state: DemoAppState;
@@ -26,61 +19,45 @@ type DemoAppContextValue = {
   toast: string;
   dismissToast: () => void;
   notify: (message: string) => void;
-  signIn: (phone: string, password: string) => Result;
-  completeSignUp: (input: CompleteSignUpInput) => Result;
+  signIn: (phone: string, password: string) => ActionResult;
+  completeSignUp: (input: CompleteSignUpInput) => ActionResult;
   signOut: () => void;
   updateProfile: (input: Pick<UserProfile, 'name' | 'username' | 'bio' | 'city'>) => void;
   updateInterests: (interests: string[]) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   unblockUser: (userId: string) => void;
-  sendFriendRequest: (userId: string) => Result;
-  cancelFriendRequest: (userId: string) => Result;
-  acceptFriendRequest: (userId: string) => Result;
-  rejectFriendRequest: (userId: string) => Result;
-  unfriendUser: (userId: string) => Result;
-  blockUser: (userId: string) => Result;
+  sendFriendRequest: (userId: string) => ActionResult;
+  cancelFriendRequest: (userId: string) => ActionResult;
+  acceptFriendRequest: (userId: string) => ActionResult;
+  rejectFriendRequest: (userId: string) => ActionResult;
+  unfriendUser: (userId: string) => ActionResult;
+  blockUser: (userId: string) => ActionResult;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
   resetDemoData: () => void;
-  joinMeetup: (meetupId: string) => Result;
-  leaveMeetup: (meetupId: string) => Result;
-  emergencyLeave: (meetupId: string) => Result;
+  joinMeetup: (meetupId: string) => ActionResult;
+  leaveMeetup: (meetupId: string) => ActionResult;
+  emergencyLeave: (meetupId: string) => ActionResult;
   createMeetup: (draft: MeetupDraft) => string | null;
   toggleTableBooked: (meetupId: string) => void;
-  sendBillNote: (meetupId: string, text: string) => Result;
-  checkIn: (meetupId: string) => Result;
-  setBillTotal: (meetupId: string, total: number) => Result;
-  markMyPayment: (meetupId: string) => Result;
-  confirmPayment: (meetupId: string, userId: string) => Result;
-  sendSafetySignal: (meetupId: string, kind: 'grab' | 'sos') => Result;
-  sendMessage: (meetupId: string, text: string) => Result;
-  sendLocation: (meetupId: string, location: { name: string; address: string }) => Result;
-  sendEta: (meetupId: string, minutes: number) => Result;
-  createPoll: (meetupId: string, question: string, options: string[]) => Result;
+  sendBillNote: (meetupId: string, text: string) => ActionResult;
+  checkIn: (meetupId: string) => ActionResult;
+  setBillTotal: (meetupId: string, total: number) => ActionResult;
+  markMyPayment: (meetupId: string) => ActionResult;
+  confirmPayment: (meetupId: string, userId: string) => ActionResult;
+  sendSafetySignal: (meetupId: string, kind: 'grab' | 'sos') => ActionResult;
+  sendMessage: (meetupId: string, text: string) => ActionResult;
+  sendLocation: (meetupId: string, location: { name: string; address: string }) => ActionResult;
+  sendEta: (meetupId: string, minutes: number) => ActionResult;
+  createPoll: (meetupId: string, question: string, options: string[]) => ActionResult;
   votePoll: (meetupId: string, messageId: string, optionId: string) => void;
   markRoomRead: (meetupId: string) => void;
-  ensureChatRoom: (meetupId: string) => Result;
+  ensureChatRoom: (meetupId: string) => ActionResult;
 };
 
 const DemoAppContext = createContext<DemoAppContextValue | null>(null);
 
 const id = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const phoneValid = (value: string) => /^[0-9]{9,11}$/.test(value.replace(/\s/g, ''));
-const vietnamPhoneValid = (value: string) => /^(?:\+84|84|0)(?:3|5|7|8|9)\d{8}$/.test(value.replace(/[\s.-]/g, ''));
-const normalizeStoredDateOfBirth = (value: string) => {
-  const legacy = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  return legacy ? `${legacy[2]}-${legacy[3]}-${legacy[1]}` : value;
-};
-const adultDateOfBirthValid = (value: string) => {
-  if (!/^\d{2}-\d{2}-\d{4}$/.test(value)) return false;
-  const [month, day, year] = value.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return false;
-  const today = new Date();
-  const adultCutoff = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
-  return date <= adultCutoff;
-};
-
 export function DemoAppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DemoAppState>(() => createSeedState());
   const [hydrated, setHydrated] = useState(false);
@@ -88,65 +65,24 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true;
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (!alive || !raw) return;
-        const parsed = JSON.parse(raw) as Partial<DemoAppState>;
-        const storedVersion = (parsed as unknown as { version?: unknown }).version;
-        if ((storedVersion === 1 || storedVersion === 2 || storedVersion === 3) && Array.isArray(parsed.meetups) && Array.isArray(parsed.chats)) {
-          const seed = createSeedState();
-          const storedProfile = parsed.profile ?? seed.profile;
-          const profile: UserProfile = {
-            ...seed.profile,
-            ...storedProfile,
-            dateOfBirth: normalizeStoredDateOfBirth(storedProfile.dateOfBirth || seed.profile.dateOfBirth),
-            verifiedPhone: storedProfile.verifiedPhone ?? seed.profile.verifiedPhone,
-            preferredVibes: Array.isArray(storedProfile.preferredVibes) ? storedProfile.preferredVibes : seed.profile.preferredVibes,
-          };
-          const users = Array.isArray(parsed.users) ? parsed.users : seed.users;
-          const mergedUsers = users.map((user) => user.id === profile.id ? {
-            ...user,
-            name: profile.name,
-            username: profile.username,
-            bio: profile.bio,
-            city: profile.city,
-            interests: profile.interests,
-          } : user);
-          setState({
-            ...seed,
-            ...parsed,
-            version: 3,
-            profile,
-            currentUser: parsed.currentUser ? profile : null,
-            meetups: parsed.meetups.map((meetup) => ({ ...meetup, isPublic: meetup.isPublic !== false, age18Plus: meetup.age18Plus ?? false, tableBooked: meetup.tableBooked ?? false, menuItems: Array.isArray(meetup.menuItems) ? meetup.menuItems : [], depositAmount: meetup.depositAmount ?? 0, billShares: Array.isArray(meetup.billShares) ? meetup.billShares : [], checkedInIds: Array.isArray(meetup.checkedInIds) ? meetup.checkedInIds : [] })),
-            chats: parsed.chats,
-            users: mergedUsers,
-            friendIds: Array.isArray(parsed.friendIds) ? parsed.friendIds : seed.friendIds,
-            sentFriendRequestIds: Array.isArray(parsed.sentFriendRequestIds) ? parsed.sentFriendRequestIds : seed.sentFriendRequestIds,
-            receivedFriendRequestIds: Array.isArray(parsed.receivedFriendRequestIds) ? parsed.receivedFriendRequestIds : seed.receivedFriendRequestIds,
-            blockedUsers: Array.isArray(parsed.blockedUsers)
-              ? parsed.blockedUsers.map((blocked) => mergedUsers.find((user) => user.id === blocked.id) ?? blocked)
-              : seed.blockedUsers,
-            notifications: Array.isArray(parsed.notifications) ? parsed.notifications : seed.notifications,
-          });
-        }
-      })
-      .catch(() => undefined)
+    loadDemoState()
+      .then((storedState) => { if (alive && storedState) setState(storedState); })
+      .catch(() => { if (alive) setToast('Không thể khôi phục dữ liệu demo. Ứng dụng đang dùng dữ liệu mặc định.'); })
       .finally(() => { if (alive) setHydrated(true); });
     return () => { alive = false; };
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => setToast('Không thể lưu dữ liệu demo trên thiết bị này.'));
+    saveDemoState(state).catch(() => setToast('Không thể lưu dữ liệu demo trên thiết bị này.'));
   }, [hydrated, state]);
 
   const notify = useCallback((message: string) => setToast(message), []);
   const dismissToast = useCallback(() => setToast(''), []);
 
-  const signIn = useCallback((phone: string, password: string): Result => {
-    if (!phoneValid(phone)) return { ok: false, error: 'Số điện thoại cần có 9–11 chữ số.' };
-    if (password.trim().length < 6) return { ok: false, error: 'Mật khẩu cần ít nhất 6 ký tự.' };
+  const signIn = useCallback((phone: string, password: string): ActionResult => {
+    const validation = validateSignInCredentials(phone, password);
+    if (!validation.ok) return validation;
     setState((current) => {
       const profile = { ...current.profile, phone: phone.replace(/\s/g, '') };
       return { ...current, profile, currentUser: profile };
@@ -154,21 +90,16 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, []);
 
-  const completeSignUp = useCallback((input: CompleteSignUpInput): Result => {
-    const username = input.username.trim().replace(/^@/, '').toLowerCase();
-    if (!vietnamPhoneValid(input.phone)) return { ok: false, error: 'Số điện thoại Việt Nam không hợp lệ.' };
-    if (input.name.trim().length < 2) return { ok: false, error: 'Vui lòng nhập họ và tên.' };
-    if (!/^[a-zA-Z0-9_.]{3,20}$/.test(username)) return { ok: false, error: 'Username cần 3–20 chữ, số, dấu chấm hoặc gạch dưới.' };
-    if (state.users.some((user) => user.username.toLowerCase() === username)) return { ok: false, error: 'Username đã được sử dụng.' };
-    if (!adultDateOfBirthValid(input.dateOfBirth)) return { ok: false, error: 'Ngày sinh không hợp lệ hoặc bạn chưa đủ 18 tuổi.' };
-    if (!input.city.trim()) return { ok: false, error: 'Vui lòng nhập thành phố.' };
-    if (input.interests.length < 3) return { ok: false, error: 'Vui lòng chọn ít nhất 3 sở thích.' };
+  const completeSignUp = useCallback((input: CompleteSignUpInput): ActionResult => {
+    const validation = validateCompleteSignUp(input, state.users.map((user) => user.username));
+    if (!validation.ok) return validation;
+    const username = normalizeUsername(input.username).toLowerCase();
     const userId = `user-${username}-${Date.now().toString(36)}`;
     const profile: UserProfile = {
       id: userId,
       name: input.name.trim(),
       username,
-      phone: input.phone.replace(/[\s.-]/g, ''),
+      phone: normalizePhone(input.phone),
       bio: input.bio.trim(),
       city: input.city.trim(),
       interests: input.interests,
@@ -240,7 +171,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     notify('Đã bỏ chặn tài khoản.');
   }, [notify]);
 
-  const sendFriendRequest = useCallback((userId: string): Result => {
+  const sendFriendRequest = useCallback((userId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     if (userId === state.currentUser.id) return { ok: false, error: 'Bạn không thể tự kết bạn với chính mình.' };
     if (state.blockedUsers.some((user) => user.id === userId)) return { ok: false, error: 'Hãy bỏ chặn người dùng trước khi kết bạn.' };
@@ -252,14 +183,14 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [notify, state.blockedUsers, state.currentUser, state.friendIds, state.receivedFriendRequestIds, state.sentFriendRequestIds]);
 
-  const cancelFriendRequest = useCallback((userId: string): Result => {
+  const cancelFriendRequest = useCallback((userId: string): ActionResult => {
     if (!state.sentFriendRequestIds.includes(userId)) return { ok: false, error: 'Lời mời này không còn ở trạng thái chờ.' };
     setState((current) => ({ ...current, sentFriendRequestIds: current.sentFriendRequestIds.filter((idValue) => idValue !== userId) }));
     notify('Đã hủy lời mời kết bạn.');
     return { ok: true };
   }, [notify, state.sentFriendRequestIds]);
 
-  const acceptFriendRequest = useCallback((userId: string): Result => {
+  const acceptFriendRequest = useCallback((userId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     if (state.blockedUsers.some((user) => user.id === userId)) return { ok: false, error: 'Người dùng này đang bị chặn.' };
     if (!state.receivedFriendRequestIds.includes(userId)) return { ok: false, error: 'Lời mời này không còn tồn tại.' };
@@ -283,14 +214,14 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [notify, state.blockedUsers, state.currentUser, state.receivedFriendRequestIds, state.users]);
 
-  const rejectFriendRequest = useCallback((userId: string): Result => {
+  const rejectFriendRequest = useCallback((userId: string): ActionResult => {
     if (!state.receivedFriendRequestIds.includes(userId)) return { ok: false, error: 'Lời mời này không còn tồn tại.' };
     setState((current) => ({ ...current, receivedFriendRequestIds: current.receivedFriendRequestIds.filter((idValue) => idValue !== userId) }));
     notify('Đã từ chối lời mời kết bạn.');
     return { ok: true };
   }, [notify, state.receivedFriendRequestIds]);
 
-  const unfriendUser = useCallback((userId: string): Result => {
+  const unfriendUser = useCallback((userId: string): ActionResult => {
     if (!state.friendIds.includes(userId)) return { ok: false, error: 'Hai bạn hiện không phải bạn bè.' };
     setState((current) => current.blockedUsers.some((item) => item.id === userId) ? current : ({
       ...current,
@@ -305,7 +236,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [notify, state.friendIds]);
 
-  const blockUser = useCallback((userId: string): Result => {
+  const blockUser = useCallback((userId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     if (userId === state.currentUser.id) return { ok: false, error: 'Bạn không thể chặn chính mình.' };
     const user = state.users.find((item) => item.id === userId);
@@ -345,7 +276,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     notify('Đã khôi phục dữ liệu demo ban đầu.');
   }, [notify]);
 
-  const joinMeetup = useCallback((meetupId: string): Result => {
+  const joinMeetup = useCallback((meetupId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Vui lòng đăng nhập để tham gia.' };
     const meetup = state.meetups.find((item) => item.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy meetup.' };
@@ -353,7 +284,8 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     if (meetup.participants.length >= meetup.maxParticipants) return { ok: false, error: 'Meetup đã đủ người.' };
     const deposit = meetup.depositAmount ?? 0;
     setState((current) => {
-      const user = current.currentUser!;
+      const user = current.currentUser;
+      if (!user) return current;
       const meetups = current.meetups.map((item) => {
         if (item.id !== meetupId) return item;
         const shares = [...(item.billShares ?? [])];
@@ -380,7 +312,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [notify, state.currentUser, state.meetups]);
 
-  const leaveMeetup = useCallback((meetupId: string): Result => {
+  const leaveMeetup = useCallback((meetupId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((item) => item.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy meetup.' };
@@ -397,13 +329,13 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
         ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `${current.currentUser?.name} đã rời kèo.${deposit > 0 ? ` Cọc ${deposit.toLocaleString('vi-VN')}đ được chia cho người ở lại (demo).` : ''}`, createdAt: new Date().toISOString() }],
       } : room),
-      users: current.users.map((u) => u.id === current.currentUser?.id ? { ...u, noShowCount: (u.noShowCount ?? 0) + 1, reliabilityScore: Math.max(40, (u.reliabilityScore ?? 90) - 5) } : u),
+      users: current.users.map((user) => user.id === current.currentUser?.id ? { ...user, ...applyNoShowPenalty(user) } : user),
     }));
     notify(deposit > 0 ? 'Bạn đã rời kèo và mất cọc demo cho quỹ chung.' : 'Bạn đã rời meetup.');
     return { ok: true };
   }, [notify, state.currentUser, state.meetups]);
 
-  const emergencyLeave = useCallback((meetupId: string): Result => {
+  const emergencyLeave = useCallback((meetupId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((item) => item.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy meetup.' };
@@ -462,7 +394,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return meetupId;
   }, [notify, state.currentUser]);
 
-  const appendMessage = useCallback((meetupId: string, create: (user: UserProfile) => ChatMessage): Result => {
+  const appendMessage = useCallback((meetupId: string, create: (user: UserProfile) => ChatMessage): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((item) => item.id === meetupId);
     const allowed = meetup && (meetup.hostId === state.currentUser.id || meetup.participants.some((user) => user.id === state.currentUser?.id));
@@ -526,7 +458,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     }));
   }, [appendMessage]);
 
-  const checkIn = useCallback((meetupId: string): Result => {
+  const checkIn = useCallback((meetupId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((m) => m.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy kèo.' };
@@ -544,14 +476,15 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [notify, state.currentUser, state.meetups]);
 
-  const setBillTotal = useCallback((meetupId: string, total: number): Result => {
+  const setBillTotal = useCallback((meetupId: string, total: number): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
+    const currentUser = state.currentUser;
     const meetup = state.meetups.find((m) => m.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy kèo.' };
     if (meetup.hostId !== state.currentUser.id) return { ok: false, error: 'Chỉ host mới được chốt tổng bill.' };
     if (!Number.isFinite(total) || total <= 0) return { ok: false, error: 'Tổng bill phải lớn hơn 0.' };
     const rounded = Math.round(total);
-    const shares = calcCampuchiaShares(rounded, meetup.participants.map((p) => p.id));
+    const shares = splitBillEqually(rounded, meetup.participants.map((participant) => participant.id));
     setState((current) => ({
       ...current,
       meetups: current.meetups.map((m) => m.id === meetupId ? {
@@ -562,29 +495,30 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         }),
       } : m),
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'text' as const, senderId: state.currentUser!.id, senderName: state.currentUser!.name, text: `🧾 Host đã chốt bill ${rounded.toLocaleString('vi-VN')}đ — mỗi người ~${Math.round(rounded / Math.max(1, meetup.participants.length)).toLocaleString('vi-VN')}đ (đã trừ cọc demo khi xác nhận).`, createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, { id: id('msg'), type: 'text' as const, senderId: currentUser.id, senderName: currentUser.name, text: `🧾 Host đã chốt bill ${rounded.toLocaleString('vi-VN')}đ — mỗi người ~${Math.round(rounded / Math.max(1, meetup.participants.length)).toLocaleString('vi-VN')}đ (đã trừ cọc demo khi xác nhận).`, createdAt: new Date().toISOString() }],
       } : room),
     }));
     notify(`Đã chốt bill ${rounded.toLocaleString('vi-VN')}đ, chia đều cho cả bàn.`);
     return { ok: true };
   }, [notify, state.currentUser, state.meetups]);
 
-  const markMyPayment = useCallback((meetupId: string): Result => {
+  const markMyPayment = useCallback((meetupId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
+    const currentUser = state.currentUser;
     const meetup = state.meetups.find((m) => m.id === meetupId);
     if (!meetup?.billTotal) return { ok: false, error: 'Host chưa chốt bill.' };
     const me = state.currentUser.id;
     setState((current) => ({
       ...current,
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'text' as const, senderId: me, senderName: state.currentUser!.name, text: '✅ Tôi đã chuyển tiền bill, host xác nhận giúp nhé!', createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, { id: id('msg'), type: 'text' as const, senderId: me, senderName: currentUser.name, text: '✅ Tôi đã chuyển tiền bill, host xác nhận giúp nhé!', createdAt: new Date().toISOString() }],
       } : room),
     }));
     notify('Đã báo đã trả. Chờ host xác nhận.');
     return { ok: true };
   }, [notify, state.currentUser, state.meetups]);
 
-  const confirmPayment = useCallback((meetupId: string, userId: string): Result => {
+  const confirmPayment = useCallback((meetupId: string, userId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((m) => m.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy kèo.' };
@@ -597,13 +531,13 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
         ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `Host đã xác nhận thanh toán của thành viên.`, createdAt: new Date().toISOString() }],
       } : room),
-      users: current.users.map((u) => u.id === userId ? { ...u, completedKeos: (u.completedKeos ?? 0) + 1, reliabilityScore: Math.min(100, (u.reliabilityScore ?? 85) + 1) } : u),
+      users: current.users.map((user) => user.id === userId ? { ...user, ...applyCompletedMeetupReward(user) } : user),
     }));
     notify('Đã xác nhận thanh toán.');
     return { ok: true };
   }, [notify, state.currentUser, state.meetups]);
 
-  const sendSafetySignal = useCallback((meetupId: string, kind: 'grab' | 'sos'): Result => {
+  const sendSafetySignal = useCallback((meetupId: string, kind: 'grab' | 'sos'): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((m) => m.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy kèo.' };
@@ -620,7 +554,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
 
   const markRoomRead = useCallback((meetupId: string) => setState((current) => ({ ...current, chats: current.chats.map((room) => room.meetupId === meetupId ? { ...room, unread: 0 } : room) })), []);
 
-  const ensureChatRoom = useCallback((meetupId: string): Result => {
+  const ensureChatRoom = useCallback((meetupId: string): ActionResult => {
     if (!state.currentUser) return { ok: false, error: 'Bạn chưa đăng nhập.' };
     const meetup = state.meetups.find((item) => item.id === meetupId);
     if (!meetup) return { ok: false, error: 'Không tìm thấy meetup.' };

@@ -1,37 +1,27 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MeetupCard } from '@/components/meetup-card';
 import { AppButton, BottomSheet, Chip } from '@/components/ui/app-primitives';
-import { useDemoApp } from '@/context/demo-app-context';
-import { FILTERS, filterAndSortMeetups, visibleMeetupsForUser, type MeetupFilter, type MeetupSort } from '@/data/demo-data';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
+import { type MeetupFilter } from '@/src/features/sessions/constants';
+import { useMeetupDiscovery } from '@/src/features/sessions/hooks/use-meetup-discovery';
+import type { MeetupSort } from '@/src/features/sessions/types';
 
 const SORT_OPTIONS: MeetupSort[] = ['Gần nhất', 'Sắp diễn ra', 'Còn nhiều chỗ'];
 
 export default function ExploreScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ q?: string }>();
-  const { state } = useDemoApp();
   const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
   const [filters, setFilters] = useState<MeetupFilter[]>([]);
   const [sort, setSort] = useState<MeetupSort>('Gần nhất');
   const [sortSheet, setSortSheet] = useState(false);
 
-  const personalizedFilters = useMemo(() => {
-    const preferences = new Set([...state.profile.interests, ...state.profile.preferredVibes].map((value) => value.toLocaleLowerCase('vi-VN')));
-    return [FILTERS[0], ...FILTERS.slice(1).map((filter, index) => ({ filter, index }))
-      .sort((a, b) => Number(preferences.has(b.filter.toLocaleLowerCase('vi-VN'))) - Number(preferences.has(a.filter.toLocaleLowerCase('vi-VN'))) || a.index - b.index)
-      .map(({ filter }) => filter)];
-  }, [state.profile.interests, state.profile.preferredVibes]);
-
-  const results = useMemo(
-    () => filterAndSortMeetups(visibleMeetupsForUser(state.meetups, state.currentUser?.id), query, filters, sort),
-    [filters, query, sort, state.currentUser?.id, state.meetups],
-  );
+  const { meetups: results, personalizedFilters } = useMeetupDiscovery({ query, filters, sort });
 
   const toggleFilter = (filter: MeetupFilter) => {
     if (filter === 'Tất cả') {

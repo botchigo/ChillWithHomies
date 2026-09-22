@@ -15,19 +15,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppColors, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
+import { useAuth } from '@/src/features/auth/hooks/use-auth';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const { hydrated, state, notify } = useDemoApp();
+  const { hydrated, currentUser, notify } = useAuth();
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [focused, setFocused] = useState(false);
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    if (hydrated && state.currentUser) router.replace('/(tabs)');
-  }, [hydrated, router, state.currentUser]);
+    if (hydrated && currentUser) router.replace('/(tabs)');
+  }, [currentUser, hydrated, router]);
 
   function onSend() {
     const digits = phone.replace(/\s/g, '');
@@ -44,7 +44,7 @@ export default function ForgotPasswordScreen() {
     notify('Đã gửi hướng dẫn đặt lại mật khẩu (demo).');
   }
 
-  if (!hydrated || state.currentUser) {
+  if (!hydrated || currentUser) {
     return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /></View>;
   }
 

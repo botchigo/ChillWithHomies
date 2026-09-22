@@ -5,13 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import { formatMessageTime, type DemoNotification } from '@/data/demo-data';
+import { useNotifications } from '@/src/features/notifications/hooks/use-notifications';
+import type { DemoNotification } from '@/src/features/notifications/types';
+import { formatMessageTime } from '@/src/shared/utils/formatters';
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { state, hydrated, markNotificationRead, markAllNotificationsRead } = useDemoApp();
-  const unread = state.notifications.filter((notification) => !notification.read).length;
+  const { currentUser, notifications, hydrated, markNotificationRead, markAllNotificationsRead } = useNotifications();
+  const unread = notifications.filter((notification) => !notification.read).length;
   const goBack = () => router.canGoBack() ? router.back() : router.replace('/');
 
   const openNotification = (notification: DemoNotification) => {
@@ -34,7 +35,7 @@ export default function NotificationsScreen() {
   };
 
   if (!hydrated) return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /></View>;
-  if (!state.currentUser) return <Redirect href="/signin" />;
+  if (!currentUser) return <Redirect href="/signin" />;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -46,7 +47,7 @@ export default function NotificationsScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.summary}><View style={styles.summaryIcon}><FontAwesome name="bell" size={18} color={AppColors.accent} /></View><View style={{ flex: 1 }}><Text style={styles.summaryTitle}>{unread ? `${unread} thông báo chưa đọc` : 'Bạn đã đọc hết thông báo'}</Text><Text style={styles.summaryText}>Lời mời bạn bè, meetup và tin nhắn nhóm đều ở đây.</Text></View></View>
-        {state.notifications.map((notification) => (
+        {notifications.map((notification) => (
           <Pressable key={notification.id} accessibilityRole="button" accessibilityLabel={notification.title} onPress={() => openNotification(notification)} style={({ pressed }) => pressed && styles.pressed}>
             <SurfaceCard style={[styles.notification, !notification.read && styles.notificationUnread]}>
               <View style={[styles.icon, { backgroundColor: iconTone(notification.type) }]}><FontAwesome name={iconName(notification.type)} size={17} color={iconColor(notification.type)} /></View>
@@ -55,7 +56,7 @@ export default function NotificationsScreen() {
             </SurfaceCard>
           </Pressable>
         ))}
-        {!state.notifications.length ? <View style={styles.empty}><View style={styles.emptyIcon}><FontAwesome name="bell-o" size={29} color={AppColors.accent} /></View><Text style={styles.emptyTitle}>Chưa có thông báo</Text><Text style={styles.emptyText}>Khi có lời mời kết bạn hoặc cập nhật meetup, bạn sẽ thấy tại đây.</Text></View> : null}
+        {!notifications.length ? <View style={styles.empty}><View style={styles.emptyIcon}><FontAwesome name="bell-o" size={29} color={AppColors.accent} /></View><Text style={styles.emptyTitle}>Chưa có thông báo</Text><Text style={styles.emptyText}>Khi có lời mời kết bạn hoặc cập nhật meetup, bạn sẽ thấy tại đây.</Text></View> : null}
       </ScrollView>
     </SafeAreaView>
   );

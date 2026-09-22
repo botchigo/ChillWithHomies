@@ -6,41 +6,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppInput, BottomSheet, Chip, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import { ALCOHOL_TYPES, BILL_SPLITS, DEPOSIT_OPTIONS, DRINK_LIMITS, NHAU_CATEGORIES, formatVND } from '@/data/demo-data';
+import { ALCOHOL_TYPES, BILL_SPLITS, DEPOSIT_OPTIONS, DRINK_LIMITS, SESSION_CATEGORIES } from '@/src/features/sessions/constants';
+import { useCreateMeetup } from '@/src/features/sessions/hooks/use-create-meetup';
+import { createMeetupDateOptions, toLocalIsoDate, validateCreateMeetupForm, type CreateMeetupFormErrors } from '@/src/features/sessions/services/create-meetup-form';
+import { formatVND } from '@/src/features/sessions/services/session-rules';
 
-const TYPES = [...NHAU_CATEGORIES];
+const TYPES = [...SESSION_CATEGORIES];
 const VIBES = ['Chill', 'Vui vẻ', 'Nhậu', 'Người mới', 'Nhóm nhỏ', 'Rooftop'];
 const SIZES = [2, 3, 4, 6, 8, 10, 12];
 const TIMES = ['17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'];
 
 type Sheet = 'date' | 'time' | 'size' | 'payment' | 'alcohol' | 'drink' | 'deposit' | null;
-type FormErrors = Partial<Record<'title' | 'location' | 'date' | 'description' | 'age', string>>;
-
-function toIsoDate(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function createDateOptions() {
-  return Array.from({ length: 14 }, (_, index) => {
-    const value = new Date();
-    value.setHours(12, 0, 0, 0);
-    value.setDate(value.getDate() + index);
-    const prefix = index === 0 ? 'Hôm nay' : index === 1 ? 'Ngày mai' : value.toLocaleDateString('vi-VN', { weekday: 'long' });
-    return {
-      value: toIsoDate(value),
-      label: `${prefix}, ${value.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`,
-    };
-  });
-}
 
 export default function CreateMeetupScreen() {
   const router = useRouter();
-  const { createMeetup, notify } = useDemoApp();
-  const dates = useMemo(() => createDateOptions(), []);
+  const { createMeetup, notify } = useCreateMeetup();
+  const dates = useMemo(() => createMeetupDateOptions(), []);
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [district, setDistrict] = useState('Quận 1');
@@ -50,7 +31,7 @@ export default function CreateMeetupScreen() {
   const [category, setCategory] = useState<string>(TYPES[0]);
   const [alcoholType, setAlcoholType] = useState<string>(ALCOHOL_TYPES[0]);
   const [vibes, setVibes] = useState<string[]>(['Chill']);
-  const [date, setDate] = useState(dates[0]?.value ?? toIsoDate(new Date()));
+  const [date, setDate] = useState(dates[0]?.value ?? toLocalIsoDate(new Date()));
   const [time, setTime] = useState('19:30');
   const [size, setSize] = useState(4);
   const [paymentType, setPaymentType] = useState<string>(BILL_SPLITS[0]);
@@ -59,7 +40,7 @@ export default function CreateMeetupScreen() {
   const [isPublic, setIsPublic] = useState(true);
   const [ageConfirm, setAgeConfirm] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<CreateMeetupFormErrors>({});
 
   const selectedDate = dates.find((item) => item.value === date)?.label ?? date;
   const toggleVibe = (value: string) => setVibes((current) => current.includes(value)
@@ -67,14 +48,7 @@ export default function CreateMeetupScreen() {
     : [...current, value]);
 
   const validate = () => {
-    const next: FormErrors = {};
-    if (!title.trim()) next.title = 'Vui lòng đặt tên cho kèo nhậu.';
-    else if (title.trim().length < 3) next.title = 'Tên kèo cần ít nhất 3 ký tự.';
-    if (!location.trim()) next.location = 'Vui lòng nhập quán nhậu / địa điểm.';
-    const startsAt = new Date(`${date}T${time}:00`);
-    if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) next.date = 'Ngày và giờ nhậu phải ở trong tương lai.';
-    if (description.length > 300) next.description = 'Mô tả tối đa 300 ký tự.';
-    if (!ageConfirm) next.age = 'Bạn cần xác nhận tất cả thành viên đã đủ 18 tuổi.';
+    const next = validateCreateMeetupForm({ title, location, date, time, description, ageConfirmed: ageConfirm });
     setErrors(next);
     return Object.keys(next).length === 0;
   };

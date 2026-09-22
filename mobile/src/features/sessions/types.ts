@@ -1,0 +1,65 @@
+import type { UserSummary } from '@/src/features/profile/types';
+
+export type MeetupStatus = 'upcoming' | 'ongoing' | 'ended';
+export type MeetupSort = 'Gần nhất' | 'Sắp diễn ra' | 'Còn nhiều chỗ';
+export type AlcoholType = 'Bia hơi' | 'Bia craft' | 'Rượu' | 'Cocktail' | 'Không cồn' | 'Mix';
+export type MenuItem = { name: string; price: number };
+export type BillShare = { userId: string; amount: number; paid: boolean; checkedIn?: boolean };
+
+export type Meetup = {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  dateLabel: string;
+  time: string;
+  location: string;
+  district: string;
+  distanceKm: number;
+  hostId: string;
+  hostName: string;
+  hostAvatar: string;
+  hostAvatarColor: string;
+  hostAvatarUri?: string;
+  hostVerified: boolean;
+  participants: UserSummary[];
+  maxParticipants: number;
+  vibe: string[];
+  paymentType: string;
+  description: string;
+  status: MeetupStatus;
+  isPublic: boolean;
+  image: 'rooftop' | 'coffee' | 'games' | 'karaoke' | 'dinner' | 'running' | 'workshop';
+  color: string;
+  alcoholType?: AlcoholType | string;
+  menuItems?: MenuItem[];
+  billNote?: string;
+  drinkLimit?: string;
+  age18Plus?: boolean;
+  mapQuery?: string;
+  tableBooked?: boolean;
+  depositAmount?: number;
+  billTotal?: number;
+  billShares?: BillShare[];
+  checkedInIds?: string[];
+};
+
+export type MeetupDraft = {
+  title: string;
+  category: string;
+  date: string;
+  time: string;
+  location: string;
+  district?: string;
+  maxParticipants: number;
+  paymentType: string;
+  vibe: string[];
+  description: string;
+  isPublic: boolean;
+  alcoholType?: string;
+  menuNote?: string;
+  billNote?: string;
+  drinkLimit?: string;
+  ageConfirm?: boolean;
+  depositAmount?: number;
+};

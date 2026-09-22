@@ -15,13 +15,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
+import { useAuth } from '@/src/features/auth/hooks/use-auth';
 
 type FieldErrors = { phone?: string; password?: string; form?: string };
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { hydrated, state, signIn, notify } = useDemoApp();
+  const { hydrated, currentUser, signIn, notify } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,8 +30,8 @@ export default function SignInScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (hydrated && state.currentUser) router.replace('/(tabs)');
-  }, [hydrated, router, state.currentUser]);
+    if (hydrated && currentUser) router.replace('/(tabs)');
+  }, [currentUser, hydrated, router]);
 
   function validate() {
     const next: FieldErrors = {};
@@ -57,7 +57,7 @@ export default function SignInScreen() {
     router.replace('/(tabs)');
   }
 
-  if (!hydrated || state.currentUser) {
+  if (!hydrated || currentUser) {
     return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /></View>;
   }
 

@@ -6,9 +6,14 @@ import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Sha
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppInput, Badge, BottomSheet, Chip, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
-import { useDemoApp } from '@/context/demo-app-context';
-import { buildMapUrl, estimateBillPerPerson, formatDate, formatDistance, formatTrust, formatVND, unpaidShares, type MeetupStatus, type UserSummary } from '@/data/demo-data';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
+import { useSafety } from '@/src/features/safety/hooks/use-safety';
+import { useMeetupDetails } from '@/src/features/sessions/hooks/use-meetup-details';
+import { buildMapUrl, estimateBillPerPerson, formatDistance, formatVND, getUnpaidShares } from '@/src/features/sessions/services/session-rules';
+import type { MeetupStatus } from '@/src/features/sessions/types';
+import type { UserSummary } from '@/src/features/profile/types';
+import { formatTrustScore } from '@/src/features/trust/services/trust-score';
+import { formatDate } from '@/src/shared/utils/formatters';
 
 const cover = require('@/assets/images/meetup-rooftop.png');
 const profileAvatar = require('@/assets/images/profile-minh-anh.png');
@@ -16,13 +21,13 @@ const profileAvatar = require('@/assets/images/profile-minh-anh.png');
 export default function MeetupDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
-  const { state, hydrated, joinMeetup, leaveMeetup, emergencyLeave, toggleTableBooked, checkIn, setBillTotal, markMyPayment, confirmPayment, sendSafetySignal, notify } = useDemoApp();
+  const { meetup, host, currentUser, hydrated, joinMeetup, leaveMeetup, toggleTableBooked, checkIn, setBillTotal, markMyPayment, confirmPayment, notify } = useMeetupDetails(params.id);
+  const { emergencyLeave, sendSafetySignal } = useSafety();
   const [saved, setSaved] = useState(false);
   const [hostSheet, setHostSheet] = useState(false);
   const [billSheet, setBillSheet] = useState(false);
   const [billTotalInput, setBillTotalInput] = useState('');
   const [billError, setBillError] = useState('');
-  const meetup = state.meetups.find((item) => item.id === params.id);
 
   const goBack = () => router.canGoBack() ? router.back() : router.replace('/');
 
@@ -30,7 +35,7 @@ export default function MeetupDetailScreen() {
     return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /></View>;
   }
 
-  if (!state.currentUser) return <Redirect href="/signin" />;
+  if (!currentUser) return <Redirect href="/signin" />;
 
   if (!meetup) {
     return (
@@ -46,7 +51,7 @@ export default function MeetupDetailScreen() {
     );
   }
 
-  const currentUserId = state.currentUser?.id;
+  const currentUserId = currentUser.id;
   const isHost = currentUserId === meetup.hostId;
   const isJoined = !!currentUserId && meetup.participants.some((participant) => participant.id === currentUserId);
   const canChat = isHost || isJoined;
@@ -94,7 +99,7 @@ export default function MeetupDetailScreen() {
   const billPerPerson = estimateBillPerPerson(meetup);
   const deposit = meetup.depositAmount ?? 0;
   const shares = meetup.billShares ?? [];
-  const unpaid = unpaidShares(meetup);
+  const unpaid = getUnpaidShares(meetup);
   const checkedIn = meetup.checkedInIds ?? [];
   const myShare = shares.find((s) => s.userId === currentUserId);
   const iCheckedIn = !!currentUserId && checkedIn.includes(currentUserId);
@@ -246,7 +251,7 @@ export default function MeetupDetailScreen() {
             <AppButton label="SOS người thân" icon="phone" compact variant="ghost" onPress={() => { const r = sendSafetySignal(meetup.id, 'sos'); if (!r.ok && r.error) notify(r.error); }} />
           </View>
           {canChat && !isHost ? <View style={styles.safetyActions}><AppButton label="Rời khẩn (giấu tên)" icon="sign-out" compact variant="ghost" onPress={confirmEmergency} /></View> : null}
-          <Text style={styles.trustNote}>Uy tín host: {formatTrust(state.users.find((u) => u.id === meetup.hostId)?.reliabilityScore)} · {state.users.find((u) => u.id === meetup.hostId)?.completedKeos ?? 0} kèo đã xong. Bùng kèo bị trừ điểm và hạn chế join kèo cọc cao.</Text>
+          <Text style={styles.trustNote}>Uy tín host: {formatTrustScore(host?.reliabilityScore)} · {host?.completedKeos ?? 0} kèo đã xong. Bùng kèo bị trừ điểm và hạn chế join kèo cọc cao.</Text>
         </View>
       </ScrollView>
 

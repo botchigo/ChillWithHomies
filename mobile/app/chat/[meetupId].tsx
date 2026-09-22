@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppInput, Badge, BottomSheet, IconButton } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import type { ChatMessage } from '@/data/demo-data';
+import { useChatRoom } from '@/src/features/chat/hooks/use-chat-room';
+import type { ChatMessage } from '@/src/features/chat/types';
 
 const ETA_OPTIONS = [5, 10, 15, 30];
 const DEMO_LOCATIONS = [
@@ -30,7 +30,7 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ meetupId: string }>();
   const meetupId = Array.isArray(params.meetupId) ? params.meetupId[0] : params.meetupId;
-  const { state, hydrated, sendMessage, sendLocation, sendEta, createPoll, votePoll, markRoomRead, ensureChatRoom, sendBillNote, checkIn, setBillTotal, sendSafetySignal, notify } = useDemoApp();
+  const { meetup, room, currentUser, allowed, blockedUserIds, hydrated, sendMessage, sendLocation, sendEta, createPoll, votePoll, markRoomRead, ensureChatRoom, sendBillNote, checkIn, setBillTotal, sendSafetySignal, notify } = useChatRoom(meetupId);
   const [text, setText] = useState('');
   const [sheet, setSheet] = useState<Sheet>(null);
   const [pollQuestion, setPollQuestion] = useState(POLL_TEMPLATES[0].q);
@@ -41,11 +41,6 @@ export default function ChatRoomScreen() {
   const [billTotal, setBillTotalInput] = useState('');
   const [billError, setBillError] = useState('');
   const messageList = useRef<ScrollView>(null);
-
-  const meetup = state.meetups.find((item) => item.id === meetupId);
-  const room = state.chats.find((item) => item.meetupId === meetupId);
-  const currentUser = state.currentUser;
-  const allowed = !!meetup && !!currentUser && (meetup.hostId === currentUser.id || meetup.participants.some((participant) => participant.id === currentUser.id));
 
   useEffect(() => {
     if (allowed && room?.meetupId) markRoomRead(room.meetupId);
@@ -222,7 +217,7 @@ export default function ChatRoomScreen() {
               key={message.id}
               message={message}
               mine={message.senderId === currentUser.id}
-              blocked={state.blockedUsers.some((user) => user.id === message.senderId)}
+              blocked={blockedUserIds.has(message.senderId)}
               currentUserId={currentUser.id}
               onVote={(optionId) => votePoll(meetup.id, message.id, optionId)}
             />

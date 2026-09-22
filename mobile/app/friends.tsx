@@ -6,8 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, BottomSheet, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
-import type { DemoUser } from '@/data/demo-data';
+import { calculateFriendSuggestionScore, describeFriendRelationship, describeFriendRequest, describeFriendSuggestion } from '@/src/features/matching/services/friend-matching';
+import { useSocialGraph } from '@/src/features/profile/hooks/use-social-graph';
+import type { DemoUser } from '@/src/features/profile/types';
+import { useSafety } from '@/src/features/safety/hooks/use-safety';
 
 type FriendsTab = 'friends' | 'requests' | 'suggestions';
 
@@ -22,9 +24,9 @@ export default function FriendsScreen() {
     acceptFriendRequest,
     rejectFriendRequest,
     unfriendUser,
-    blockUser,
     notify,
-  } = useDemoApp();
+  } = useSocialGraph();
+  const { blockUser } = useSafety();
   const initialTab: FriendsTab = params.tab === 'requests' || params.tab === 'suggestions' ? params.tab : 'friends';
   const [tab, setTab] = useState<FriendsTab>(initialTab);
   const [selectedUser, setSelectedUser] = useState<DemoUser | null>(null);
@@ -49,7 +51,7 @@ export default function FriendsScreen() {
     ]);
     return state.users
       .filter((user) => !excluded.has(user.id))
-      .sort((a, b) => suggestionScore(b, state) - suggestionScore(a, state));
+      .sort((a, b) => calculateFriendSuggestionScore(b, state) - calculateFriendSuggestionScore(a, state));
   }, [state]);
 
   const goBack = () => router.canGoBack() ? router.back() : router.replace('/profile');
@@ -87,7 +89,7 @@ export default function FriendsScreen() {
           <>
             <SectionIntro title={`${friends.length} người bạn`} text="Những người bạn đã kết nối qua các buổi meetup." />
             {friends.map((user) => (
-              <UserCard key={user.id} user={user} context={friendContext(user, state.friendIds)} onOpen={() => openProfile(user.id)}>
+              <UserCard key={user.id} user={user} context={describeFriendRelationship(user, state.friendIds)} onOpen={() => openProfile(user.id)}>
                 <IconButton icon="ellipsis-h" accessibilityLabel={`Mở tùy chọn với ${user.name}`} onPress={() => setSelectedUser(user)} />
               </UserCard>
             ))}
@@ -99,7 +101,7 @@ export default function FriendsScreen() {
           <>
             <SectionIntro title="Lời mời dành cho bạn" text="Chấp nhận nếu bạn nhận ra người đã gặp trong cộng đồng." />
             {received.map((user) => (
-              <UserCard key={user.id} user={user} context={requestContext(user, state)} onOpen={() => openProfile(user.id)}>
+              <UserCard key={user.id} user={user} context={describeFriendRequest(user, state)} onOpen={() => openProfile(user.id)}>
                 <View style={styles.inlineActions}>
                   <AppButton label="Từ chối" compact variant="ghost" onPress={() => run(() => rejectFriendRequest(user.id))} />
                   <AppButton label="Chấp nhận" compact onPress={() => run(() => acceptFriendRequest(user.id))} />
@@ -122,7 +124,7 @@ export default function FriendsScreen() {
           <>
             <SectionIntro title="Có thể bạn biết" text="Gợi ý dựa trên meetup chung, bạn chung và sở thích giống nhau." />
             {suggestions.map((user) => (
-              <UserCard key={user.id} user={user} context={suggestionContext(user, state)} onOpen={() => openProfile(user.id)}>
+              <UserCard key={user.id} user={user} context={describeFriendSuggestion(user, state)} onOpen={() => openProfile(user.id)}>
                 <AppButton label="Kết bạn" icon="user-plus" compact onPress={() => run(() => sendFriendRequest(user.id))} />
               </UserCard>
             ))}
@@ -153,44 +155,6 @@ export default function FriendsScreen() {
       </BottomSheet>
     </SafeAreaView>
   );
-}
-
-type SocialState = ReturnType<typeof useDemoApp>['state'];
-
-function commonMeetups(userId: string, state: SocialState) {
-  return state.meetups.filter((meetup) => meetup.participants.some((person) => person.id === state.profile.id)
-    && meetup.participants.some((person) => person.id === userId)).length;
-}
-
-function mutualFriends(user: DemoUser, friendIds: string[]) {
-  return user.friendIds.filter((friendId) => friendIds.includes(friendId)).length;
-}
-
-function sharedInterests(user: DemoUser, state: SocialState) {
-  return user.interests.filter((interest) => state.profile.interests.includes(interest)).length;
-}
-
-function suggestionScore(user: DemoUser, state: SocialState) {
-  return commonMeetups(user.id, state) * 3 + mutualFriends(user, state.friendIds) * 2 + sharedInterests(user, state);
-}
-
-function friendContext(user: DemoUser, friendIds: string[]) {
-  const mutual = mutualFriends(user, friendIds);
-  return mutual ? `${mutual} bạn chung` : `@${user.username}`;
-}
-
-function requestContext(user: DemoUser, state: SocialState) {
-  const meetups = commonMeetups(user.id, state);
-  return meetups ? `${meetups} meetup chung` : `${sharedInterests(user, state)} sở thích chung`;
-}
-
-function suggestionContext(user: DemoUser, state: SocialState) {
-  const mutual = mutualFriends(user, state.friendIds);
-  const meetups = commonMeetups(user.id, state);
-  if (mutual) return `${mutual} bạn chung · ${meetups} meetup chung`;
-  if (meetups) return `${meetups} meetup chung`;
-  const interests = sharedInterests(user, state);
-  return interests ? `${interests} sở thích chung` : `Cùng ở ${user.city}`;
 }
 
 function Tab({ label, count, selected, onPress }: { label: string; count: number; selected: boolean; onPress: () => void }) {

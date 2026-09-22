@@ -55,7 +55,8 @@ export default function DesignSystem() {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<string[]>([]);
   const show = (id: string) => {
-    const section = sections.find(item => item.id === id)!;
+    const section = sections.find(item => item.id === id);
+    if (!section) return false;
     return (category === 'Overview' || section.group === category.toUpperCase()) && (!query || `${section.name} ${section.id}`.toLowerCase().includes(query.toLowerCase()));
   };
   const jump = (id: string) => {

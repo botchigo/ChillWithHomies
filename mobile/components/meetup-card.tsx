@@ -3,15 +3,15 @@ import { Image } from 'expo-image';
 import { Alert, Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 
 import { Badge } from '@/components/ui/app-primitives';
-import { useDemoApp } from '@/context/demo-app-context';
-import { formatDistance, formatVND, unpaidShares, type Meetup } from '@/data/demo-data';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
+import { useMeetupParticipation } from '@/src/features/sessions/hooks/use-meetup-participation';
+import { formatDistance, formatVND, getUnpaidShares } from '@/src/features/sessions/services/session-rules';
+import type { Meetup } from '@/src/features/sessions/types';
 
 const cover = require('@/assets/images/meetup-rooftop.png');
 
 export function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () => void }) {
-  const { state, joinMeetup, leaveMeetup, notify } = useDemoApp();
-  const currentUserId = state.currentUser?.id;
+  const { currentUserId, joinMeetup, leaveMeetup, notify } = useMeetupParticipation();
   const isHost = currentUserId === meetup.hostId;
   const isJoined = !!currentUserId && meetup.participants.some((participant) => participant.id === currentUserId);
   const isFull = meetup.participants.length >= meetup.maxParticipants;
@@ -82,8 +82,8 @@ export function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () =>
           {meetup.alcoholType ? <Badge label={meetup.alcoholType} tone="amber" icon="beer" /> : null}
           {meetup.age18Plus ? <Badge label="18+" tone="neutral" icon="id-card" /> : null}
           {meetup.tableBooked ? <Badge label="Đã đặt bàn" tone="green" icon="check" /> : null}
-          {(meetup.depositAmount ?? 0) > 0 ? <Badge label={`Cọc ${formatVND(meetup.depositAmount!)}`} tone="green" icon="lock" /> : null}
-          {meetup.billTotal ? (unpaidShares(meetup).length ? <Badge label={`Còn ${unpaidShares(meetup).length} chưa trả`} tone="orange" icon="money" /> : <Badge label="Đã trả đủ" tone="green" icon="check" />) : null}
+          {(meetup.depositAmount ?? 0) > 0 ? <Badge label={`Cọc ${formatVND(meetup.depositAmount ?? 0)}`} tone="green" icon="lock" /> : null}
+          {meetup.billTotal ? (getUnpaidShares(meetup).length ? <Badge label={`Còn ${getUnpaidShares(meetup).length} chưa trả`} tone="orange" icon="money" /> : <Badge label="Đã trả đủ" tone="green" icon="check" />) : null}
         </View>
         <View style={styles.meta}><FontAwesome name="clock-o" size={14} color={AppColors.accent} /><Text style={styles.metaText}>{meetup.time} · {meetup.dateLabel}</Text></View>
         <View style={styles.meta}><FontAwesome name="map-marker" size={15} color={AppColors.accent} /><Text numberOfLines={1} style={styles.metaText}>{meetup.location}, {meetup.district}</Text></View>

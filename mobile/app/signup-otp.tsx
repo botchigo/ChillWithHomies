@@ -8,6 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
@@ -60,7 +62,7 @@ export default function SignUpOTPScreen() {
     }
   };
 
-  const handleKeyPress = (e: any, index: number) => {
+  const handleKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>, index: number) => {
     if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
       const newOtp = [...otp];
       newOtp[index - 1] = '';

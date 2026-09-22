@@ -5,14 +5,14 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { AppColors, FontFamily } from '@/constants/theme';
-import { useDemoApp } from '@/context/demo-app-context';
+import { useAuth } from '@/src/features/auth/hooks/use-auth';
 
 const ACTIVE = AppColors.accent;
 
 export default function TabLayout() {
-  const { hydrated, state } = useDemoApp();
+  const { hydrated, currentUser } = useAuth();
   if (!hydrated) return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /></View>;
-  if (!state.currentUser) return <Redirect href="/signin" />;
+  if (!currentUser) return <Redirect href="/signin" />;
   return (
     <Tabs
       screenOptions={{
