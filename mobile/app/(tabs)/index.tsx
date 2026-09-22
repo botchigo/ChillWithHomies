@@ -40,7 +40,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>CHÀO BUỔI TỐI 👋</Text><Text style={styles.heading}>Đi đâu hôm nay?</Text></View>
+          <View><Text style={styles.eyebrow}>TỐI NAY NHẬU GÌ? 🍺</Text><Text style={styles.heading}>Kèo nhậu gần bạn</Text></View>
           <View style={styles.notificationButton}>
             <IconButton icon="bell-o" accessibilityLabel={`Thông báo${unreadNotifications ? `, ${unreadNotifications} chưa đọc` : ''}`} onPress={() => router.push('/notifications' as Href)} />
             {unreadNotifications ? <View style={styles.notificationCount}><Text style={styles.notificationCountText}>{Math.min(unreadNotifications, 9)}</Text></View> : null}
@@ -52,7 +52,7 @@ export default function HomeScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Tìm kèo, địa điểm, không khí..."
+            placeholder="Tìm bia, quán ốc, rooftop..."
             placeholderTextColor="#AA998A"
             style={styles.searchInput}
             returnKeyType="search"
@@ -66,13 +66,13 @@ export default function HomeScreen() {
 
         <Pressable accessibilityRole="button" onPress={openExplore}>
           <LinearGradient colors={[AppColors.primary, AppColors.accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-            <View style={styles.heroCopy}><View style={styles.heroLabel}><FontAwesome name="bolt" size={12} color={AppColors.text} /><Text style={styles.heroLabelText}>GỢI Ý CHO BẠN</Text></View><Text style={styles.heroTitle}>Tối nay có kèo vui gần bạn</Text><Text style={styles.heroText}>Nhóm nhỏ, host đã xác minh và vẫn còn chỗ.</Text></View>
+            <View style={styles.heroCopy}><View style={styles.heroLabel}><FontAwesome name="beer" size={12} color={AppColors.text} /><Text style={styles.heroLabelText}>18+ · UỐNG CÓ TRÁCH NHIỆM</Text></View><Text style={styles.heroTitle}>Tối nay có kèo nhậu gần bạn</Text><Text style={styles.heroText}>Bàn nhỏ, bill rõ, host đã đặt bàn và vẫn còn chỗ.</Text></View>
             <View style={styles.heroArrow}><FontAwesome name="arrow-right" size={17} color={AppColors.accent} /></View>
             <View style={styles.bubbleOne} /><View style={styles.bubbleTwo} />
           </LinearGradient>
         </Pressable>
 
-        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{filters.includes('Tối nay') ? 'Đang diễn ra tối nay' : 'Kèo dành cho bạn'}</Text><Text style={styles.sectionCaption}>{meetups.length} meetup hợp tìm kiếm của bạn</Text></View><Pressable onPress={openExplore}><Text style={styles.seeAll}>Xem tất cả</Text></Pressable></View>
+        <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>{filters.includes('Tối nay') ? 'Nhậu tối nay' : 'Kèo nhậu dành cho bạn'}</Text><Text style={styles.sectionCaption}>{meetups.length} kèo hợp gu của bạn · 18+ only</Text></View><Pressable onPress={openExplore}><Text style={styles.seeAll}>Xem tất cả</Text></Pressable></View>
         {meetups.map((meetup) => <MeetupCard key={meetup.id} meetup={meetup} onPress={() => openMeetup(meetup.id)} />)}
         {!meetups.length ? <View style={styles.empty}><View style={styles.emptyIcon}><FontAwesome name="search" size={27} color={AppColors.accent} /></View><Text style={styles.emptyTitle}>Chưa tìm thấy kèo phù hợp</Text><Text style={styles.emptyText}>Thử một từ khóa khác hoặc xóa bộ lọc để xem thêm meetup.</Text><View style={styles.emptyAction}><AppButton label="Xóa bộ lọc" compact variant="secondary" onPress={clearSearch} /></View></View> : null}
       </ScrollView>

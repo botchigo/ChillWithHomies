@@ -47,10 +47,10 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>KHÁM PHÁ</Text><Text style={styles.heading}>Tìm đúng kèo, gặp đúng gu</Text><Text style={styles.subtitle}>Các nhóm thân thiện quanh TP. Hồ Chí Minh.</Text>
+        <Text style={styles.eyebrow}>KHÁM PHÁ KÈO NHẬU</Text><Text style={styles.heading}>Tối nay nhậu ở đâu?</Text><Text style={styles.subtitle}>Rooftop bia, quán ốc, lẩu nướng quanh TP. Hồ Chí Minh.</Text>
         <View style={styles.search}>
           <FontAwesome name="search" size={17} color={AppColors.textSecondary} />
-          <TextInput value={query} onChangeText={setQuery} placeholder="Karaoke, rooftop, Quận 1..." placeholderTextColor="#AA998A" style={styles.input} returnKeyType="search" />
+          <TextInput value={query} onChangeText={setQuery} placeholder="Bia, quán ốc, Quận 1, rooftop..." placeholderTextColor="#AA998A" style={styles.input} returnKeyType="search" />
           <Pressable accessibilityRole="button" accessibilityLabel="Sắp xếp kết quả" style={styles.filterButton} onPress={() => setSortSheet(true)}><FontAwesome name="sliders" size={16} color={AppColors.surface} /></Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>

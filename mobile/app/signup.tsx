@@ -13,8 +13,8 @@ import { useDemoApp } from '@/context/demo-app-context';
 
 const DRAFT_KEY = '@chillwithhomies/signup-draft-v1';
 const DEMO_OTP = '123456';
-const INTERESTS = ['Café', 'Board game', 'Karaoke', 'Ăn uống', 'Rooftop', 'Networking', 'Chạy bộ', 'Workshop', 'Startup', 'Du lịch', 'Thể thao', 'Phim'];
-const VIBES = ['Chill', 'Vui vẻ', 'Nhóm nhỏ', 'Làm quen người mới', 'Networking'];
+const INTERESTS = ['Nhậu', 'Bia', 'Quán ốc', 'Rooftop', 'Lẩu nướng', 'Café', 'Board game', 'Karaoke', 'Nhóm nhỏ', 'Networking', 'Chạy bộ', 'Workshop'];
+const VIBES = ['Chill', 'Vui vẻ', 'Nhậu', 'Nhóm nhỏ', 'Làm quen người mới', 'Uống có trách nhiệm'];
 const AVATAR_COLORS = ['#F28C28', '#E88F9C', '#7C9A65', '#668CB8', '#B583A7', '#D07A72'];
 
 type Step = 'account' | 'verify' | 'profile' | 'interests' | 'safety' | 'complete';

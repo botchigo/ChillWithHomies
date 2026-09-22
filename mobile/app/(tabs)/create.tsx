@@ -7,15 +7,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton, AppInput, BottomSheet, Chip, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
 import { useDemoApp } from '@/context/demo-app-context';
+import { ALCOHOL_TYPES, BILL_SPLITS, DEPOSIT_OPTIONS, DRINK_LIMITS, NHAU_CATEGORIES, formatVND } from '@/data/demo-data';
 
-const TYPES = ['Ăn uống', 'Café', 'Board game', 'Karaoke', 'Rooftop', 'Networking', 'Khác'];
-const VIBES = ['Chill', 'Vui vẻ', 'Networking', 'Người mới', 'Nhóm nhỏ'];
-const SIZES = [2, 4, 6, 8, 10, 12];
-const TIMES = ['08:00', '09:30', '14:00', '17:30', '18:00', '19:00', '19:30', '20:00'];
-const PAYMENTS = ['Mỗi người tự trả', 'Chia đều', 'Host mời', 'Thống nhất tại meetup'];
+const TYPES = [...NHAU_CATEGORIES];
+const VIBES = ['Chill', 'Vui vẻ', 'Nhậu', 'Người mới', 'Nhóm nhỏ', 'Rooftop'];
+const SIZES = [2, 3, 4, 6, 8, 10, 12];
+const TIMES = ['17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'];
 
-type Sheet = 'date' | 'time' | 'size' | 'payment' | null;
-type FormErrors = Partial<Record<'title' | 'location' | 'date' | 'description', string>>;
+type Sheet = 'date' | 'time' | 'size' | 'payment' | 'alcohol' | 'drink' | 'deposit' | null;
+type FormErrors = Partial<Record<'title' | 'location' | 'date' | 'description' | 'age', string>>;
 
 function toIsoDate(value: Date) {
   const year = value.getFullYear();
@@ -43,14 +43,21 @@ export default function CreateMeetupScreen() {
   const dates = useMemo(() => createDateOptions(), []);
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
+  const [district, setDistrict] = useState('Quận 1');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState(TYPES[0]);
+  const [menuNote, setMenuNote] = useState('');
+  const [billNote, setBillNote] = useState('');
+  const [category, setCategory] = useState<string>(TYPES[0]);
+  const [alcoholType, setAlcoholType] = useState<string>(ALCOHOL_TYPES[0]);
   const [vibes, setVibes] = useState<string[]>(['Chill']);
-  const [date, setDate] = useState(dates[1]?.value ?? toIsoDate(new Date()));
+  const [date, setDate] = useState(dates[0]?.value ?? toIsoDate(new Date()));
   const [time, setTime] = useState('19:30');
-  const [size, setSize] = useState(6);
-  const [paymentType, setPaymentType] = useState(PAYMENTS[0]);
+  const [size, setSize] = useState(4);
+  const [paymentType, setPaymentType] = useState<string>(BILL_SPLITS[0]);
+  const [drinkLimit, setDrinkLimit] = useState<string>(DRINK_LIMITS[0]);
+  const [depositAmount, setDepositAmount] = useState<number>(50000);
   const [isPublic, setIsPublic] = useState(true);
+  const [ageConfirm, setAgeConfirm] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -61,12 +68,13 @@ export default function CreateMeetupScreen() {
 
   const validate = () => {
     const next: FormErrors = {};
-    if (!title.trim()) next.title = 'Vui lòng đặt tên cho kèo.';
+    if (!title.trim()) next.title = 'Vui lòng đặt tên cho kèo nhậu.';
     else if (title.trim().length < 3) next.title = 'Tên kèo cần ít nhất 3 ký tự.';
-    if (!location.trim()) next.location = 'Vui lòng nhập địa điểm gặp mặt.';
+    if (!location.trim()) next.location = 'Vui lòng nhập quán nhậu / địa điểm.';
     const startsAt = new Date(`${date}T${time}:00`);
-    if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) next.date = 'Ngày và giờ meetup phải ở trong tương lai.';
+    if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) next.date = 'Ngày và giờ nhậu phải ở trong tương lai.';
     if (description.length > 300) next.description = 'Mô tả tối đa 300 ký tự.';
+    if (!ageConfirm) next.age = 'Bạn cần xác nhận tất cả thành viên đã đủ 18 tuổi.';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -79,14 +87,21 @@ export default function CreateMeetupScreen() {
       date,
       time,
       location,
+      district,
       maxParticipants: size,
       paymentType,
       vibe: vibes,
       description,
       isPublic,
+      alcoholType,
+      menuNote,
+      billNote,
+      drinkLimit,
+      ageConfirm,
+      depositAmount,
     });
     if (!meetupId) {
-      notify('Vui lòng đăng nhập trước khi tạo meetup.');
+      notify(!ageConfirm ? 'Vui lòng xác nhận 18+ trước khi tạo kèo.' : 'Vui lòng đăng nhập trước khi tạo kèo nhậu.');
       return;
     }
     router.replace({ pathname: '/meetup/[id]', params: { id: meetupId } });
@@ -95,13 +110,13 @@ export default function CreateMeetupScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>HOST MODE</Text>
-        <Text style={styles.heading}>Tạo một kèo mới</Text>
-        <Text style={styles.subtitle}>Cho mọi người biết bạn muốn gặp nhau thế nào.</Text>
+        <Text style={styles.eyebrow}>HOST MODE · NHẬU</Text>
+        <Text style={styles.heading}>Rủ kèo nhậu mới</Text>
+        <Text style={styles.subtitle}>Quán rõ ràng, bill rõ ràng, 18+ và uống có trách nhiệm.</Text>
 
         <View style={styles.note}>
-          <View style={styles.noteIcon}><FontAwesome name="shield" size={16} color={AppColors.success} /></View>
-          <Text style={styles.noteText}>Chọn địa điểm công cộng và mô tả rõ chi phí để mọi người yên tâm tham gia.</Text>
+          <View style={styles.noteIcon}><FontAwesome name="beer" size={16} color={AppColors.accent} /></View>
+          <Text style={styles.noteText}>Chỉ rủ ở quán công cộng. Ghi rõ ai trả + giới hạn uống để mọi người yên tâm tham gia.</Text>
         </View>
 
         <View style={styles.form}>
@@ -110,17 +125,22 @@ export default function CreateMeetupScreen() {
               label="Tên kèo *"
               value={title}
               onChangeText={(value) => { setTitle(value); if (errors.title) setErrors((current) => ({ ...current, title: undefined })); }}
-              placeholder="Ví dụ: Rooftop chill sau giờ làm"
+              placeholder="Ví dụ: Rooftop bia sau giờ làm"
               maxLength={80}
             />
             <FieldMessage error={errors.title} />
           </View>
 
           <View>
-            <Text style={styles.label}>Loại meetup</Text>
+            <Text style={styles.label}>Loại kèo nhậu</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
               {TYPES.map((item) => <Chip key={item} label={item} selected={category === item} onPress={() => setCategory(item)} />)}
             </ScrollView>
+          </View>
+
+          <View style={styles.twoColumns}>
+            <PickerField icon="beer" label="Uống gì?" value={alcoholType} onPress={() => setSheet('alcohol')} />
+            <PickerField icon="glass" label="Giới hạn" value={drinkLimit} onPress={() => setSheet('drink')} />
           </View>
 
           <View>
@@ -133,35 +153,71 @@ export default function CreateMeetupScreen() {
 
           <View>
             <AppInput
-              label="Địa điểm *"
+              label="Quán / địa điểm *"
               icon="map-marker"
               value={location}
               onChangeText={(value) => { setLocation(value); if (errors.location) setErrors((current) => ({ ...current, location: undefined })); }}
-              placeholder="Quán café hoặc địa điểm công cộng"
+              placeholder="Ốc Đào, Heart of Darkness, rooftop..."
               maxLength={100}
             />
             <FieldMessage error={errors.location} />
           </View>
 
+          <View>
+            <AppInput
+              label="Quận / khu vực"
+              icon="location-arrow"
+              value={district}
+              onChangeText={setDistrict}
+              placeholder="Quận 1, Bình Thạnh, TP. Thủ Đức..."
+              maxLength={60}
+            />
+          </View>
+
           <View style={styles.twoColumns}>
             <PickerField icon="users" label="Số người" value={`Tối đa ${size}`} onPress={() => setSheet('size')} />
-            <PickerField icon="money" label="Ai trả?" value={paymentType} onPress={() => setSheet('payment')} />
+            <PickerField icon="money" label="Chia bill" value={paymentType} onPress={() => setSheet('payment')} />
           </View>
+
+          <PickerField icon="lock" label="Cọc chống bùng / người" value={depositAmount === 0 ? 'Không cọc' : formatVND(depositAmount)} onPress={() => setSheet('deposit')} />
+          <Text style={styles.hint}>Cọc demo giữ chỗ. Hủy sát giờ mất cọc chia cho người ở lại.</Text>
 
           <View>
             <Text style={styles.label}>Không khí bạn muốn</Text>
             <View style={styles.chipWrap}>
               {VIBES.map((item) => <Chip key={item} label={item} selected={vibes.includes(item)} onPress={() => toggleVibe(item)} />)}
             </View>
-            {!vibes.length ? <Text style={styles.hint}>Bạn có thể để trống hoặc chọn nhiều vibe.</Text> : null}
           </View>
 
           <View>
             <AppInput
-              label="Mô tả"
+              label="Món dự kiến (mỗi dòng 1 món)"
+              value={menuNote}
+              onChangeText={setMenuNote}
+              placeholder={'Ốc len xào dừa 95k\nBia Tiger 23k'}
+              multiline
+              maxLength={300}
+            />
+            <Text style={styles.hint}>Ghi tên + giá để app ước tính bill/người.</Text>
+          </View>
+
+          <View>
+            <AppInput
+              label="Ghi chú chia tiền"
+              value={billNote}
+              onChangeText={setBillNote}
+              placeholder="Campuchia tại bàn, khoảng 120k/người"
+              multiline
+              maxLength={200}
+            />
+          </View>
+
+          <View>
+            <AppInput
+              label="Mô tả kèo"
               value={description}
               onChangeText={setDescription}
-              placeholder="Kể ngắn gọn về hoạt động và điều mọi người nên biết..."
+              placeholder="Happy hour mấy giờ, có chỗ không cồn không, ai say thì Grab về chung..."
               multiline
               maxLength={300}
             />
@@ -172,34 +228,56 @@ export default function CreateMeetupScreen() {
           </View>
 
           <SurfaceCard style={styles.privacyCard}>
+            <View style={styles.privacyIcon}><FontAwesome name="id-card" size={17} color={AppColors.danger} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.privacyTitle}>Cam kết 18+</Text>
+              <Text style={styles.privacyText}>Tất cả thành viên tham gia kèo có cồn đã đủ 18 tuổi. Không ép uống.</Text>
+            </View>
+            <Switch value={ageConfirm} onValueChange={(v) => { setAgeConfirm(v); if (v) setErrors((c) => ({ ...c, age: undefined })); }} trackColor={{ false: AppColors.border, true: AppColors.success }} thumbColor={AppColors.surface} />
+          </SurfaceCard>
+          <FieldMessage error={errors.age} />
+
+          <SurfaceCard style={styles.privacyCard}>
             <View style={styles.privacyIcon}><FontAwesome name={isPublic ? 'globe' : 'lock'} size={17} color={AppColors.accent} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.privacyTitle}>{isPublic ? 'Meetup công khai' : 'Meetup riêng tư'}</Text>
-              <Text style={styles.privacyText}>{isPublic ? 'Mọi người có thể khám phá và tham gia.' : 'Chỉ host và thành viên hiện có nhìn thấy meetup.'}</Text>
+              <Text style={styles.privacyTitle}>{isPublic ? 'Kèo công khai' : 'Kèo riêng tư'}</Text>
+              <Text style={styles.privacyText}>{isPublic ? 'Mọi người có thể khám phá và xin tham gia.' : 'Chỉ thành viên được mời mới thấy.'}</Text>
             </View>
             <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ false: AppColors.border, true: AppColors.primary }} thumbColor={AppColors.surface} />
           </SurfaceCard>
 
-          <AppButton label="Tạo meetup" icon="plus" onPress={submit} />
+          <AppButton label="Tạo kèo nhậu" icon="beer" onPress={submit} />
         </View>
       </ScrollView>
 
-      <BottomSheet visible={sheet === 'date'} title="Chọn ngày gặp" onClose={() => setSheet(null)}>
+      <BottomSheet visible={sheet === 'date'} title="Chọn ngày nhậu" onClose={() => setSheet(null)}>
         <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.options}>{dates.map((item) => <OptionRow key={item.value} label={item.label} selected={date === item.value} onPress={() => { setDate(item.value); setErrors((current) => ({ ...current, date: undefined })); setSheet(null); }} />)}</View>
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={sheet === 'time'} title="Chọn giờ bắt đầu" onClose={() => setSheet(null)}>
+      <BottomSheet visible={sheet === 'time'} title="Chọn giờ lên bia" onClose={() => setSheet(null)}>
           <View style={styles.optionGrid}>{TIMES.map((item) => <Pressable key={item} onPress={() => { setTime(item); setErrors((current) => ({ ...current, date: undefined })); setSheet(null); }} style={[styles.timeOption, time === item && styles.timeOptionActive]}><Text style={[styles.timeText, time === item && styles.timeTextActive]}>{item}</Text></Pressable>)}</View>
       </BottomSheet>
 
-      <BottomSheet visible={sheet === 'size'} title="Chọn quy mô nhóm" onClose={() => setSheet(null)}>
-        <View style={styles.options}>{SIZES.map((value) => <OptionRow key={value} label={`Tối đa ${value} người`} caption={value <= 6 ? 'Nhóm nhỏ, dễ trò chuyện' : 'Nhiều năng lượng hơn'} selected={size === value} onPress={() => { setSize(value); setSheet(null); }} />)}</View>
+      <BottomSheet visible={sheet === 'size'} title="Chọn quy mô bàn nhậu" onClose={() => setSheet(null)}>
+        <View style={styles.options}>{SIZES.map((value) => <OptionRow key={value} label={`Tối đa ${value} người`} caption={value <= 4 ? 'Bàn nhỏ, dễ tàn chuyện' : value <= 6 ? 'Vừa vui vừa ấm' : 'Bàn đông, chia 2 mâm'} selected={size === value} onPress={() => { setSize(value); setSheet(null); }} />)}</View>
       </BottomSheet>
 
-      <BottomSheet visible={sheet === 'payment'} title="Chi phí được chia thế nào?" onClose={() => setSheet(null)}>
-        <View style={styles.options}>{PAYMENTS.map((item) => <OptionRow key={item} label={item} selected={paymentType === item} onPress={() => { setPaymentType(item); setSheet(null); }} />)}</View>
+      <BottomSheet visible={sheet === 'payment'} title="Chia bill thế nào?" onClose={() => setSheet(null)}>
+        <View style={styles.options}>{BILL_SPLITS.map((item) => <OptionRow key={item} label={item} selected={paymentType === item} onPress={() => { setPaymentType(item); setSheet(null); }} />)}</View>
+      </BottomSheet>
+
+      <BottomSheet visible={sheet === 'alcohol'} title="Nhậu món gì?" onClose={() => setSheet(null)}>
+        <View style={styles.options}>{ALCOHOL_TYPES.map((item) => <OptionRow key={item} label={item} selected={alcoholType === item} onPress={() => { setAlcoholType(item); setSheet(null); }} />)}</View>
+      </BottomSheet>
+
+      <BottomSheet visible={sheet === 'drink'} title="Giới hạn uống" onClose={() => setSheet(null)}>
+        <View style={styles.options}>{DRINK_LIMITS.map((item) => <OptionRow key={item} label={item} selected={drinkLimit === item} onPress={() => { setDrinkLimit(item); setSheet(null); }} />)}</View>
+      </BottomSheet>
+
+      <BottomSheet visible={sheet === 'deposit'} title="Cọc chống bùng" onClose={() => setSheet(null)}>
+        <View style={styles.options}>{DEPOSIT_OPTIONS.map((v) => <OptionRow key={v} label={v === 0 ? 'Không cọc' : formatVND(v)} caption={v === 0 ? 'Dễ bị bùng giờ chót' : v <= 50000 ? 'Giữ chỗ nhẹ, dễ rủ' : 'Chắc kèo, lọc người nghiêm túc'} selected={depositAmount === v} onPress={() => { setDepositAmount(v); setSheet(null); }} />)}</View>
       </BottomSheet>
     </SafeAreaView>
   );
@@ -223,9 +301,9 @@ const styles = StyleSheet.create({
   eyebrow: { ...TypeScale.caption, fontFamily: FontFamily.bodySemiBold, color: AppColors.accent, letterSpacing: 1 },
   heading: { ...TypeScale.h1, color: AppColors.text, marginTop: 2 },
   subtitle: { ...TypeScale.body, color: AppColors.textSecondary, marginTop: 4 },
-  note: { flexDirection: 'row', gap: 11, backgroundColor: AppColors.successSoft, borderRadius: Radius.md, padding: 14, marginTop: 20 },
+  note: { flexDirection: 'row', gap: 11, backgroundColor: AppColors.accentSoft, borderRadius: Radius.md, padding: 14, marginTop: 20 },
   noteIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: AppColors.surface, alignItems: 'center', justifyContent: 'center' },
-  noteText: { ...TypeScale.caption, color: '#326E56', flex: 1 },
+  noteText: { ...TypeScale.caption, color: AppColors.accentText, flex: 1 },
   form: { gap: 21, marginTop: 24 },
   label: { ...TypeScale.label, color: AppColors.text, marginBottom: 8 },
   chipRow: { gap: 8, paddingRight: 18 },

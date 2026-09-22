@@ -22,9 +22,18 @@ export type DemoUser = UserSummary & {
   city: string;
   interests: string[];
   friendIds: string[];
+  reliabilityScore?: number;
+  completedKeos?: number;
+  noShowCount?: number;
 };
 
 export type MeetupStatus = 'upcoming' | 'ongoing' | 'ended';
+
+export type AlcoholType = 'Bia hơi' | 'Bia craft' | 'Rượu' | 'Cocktail' | 'Không cồn' | 'Mix';
+
+export type MenuItem = { name: string; price: number };
+
+export type BillShare = { userId: string; amount: number; paid: boolean; checkedIn?: boolean };
 
 export type Meetup = {
   id: string;
@@ -51,6 +60,17 @@ export type Meetup = {
   isPublic: boolean;
   image: 'rooftop' | 'coffee' | 'games' | 'karaoke' | 'dinner' | 'running' | 'workshop';
   color: string;
+  alcoholType?: AlcoholType | string;
+  menuItems?: MenuItem[];
+  billNote?: string;
+  drinkLimit?: string;
+  age18Plus?: boolean;
+  mapQuery?: string;
+  tableBooked?: boolean;
+  depositAmount?: number;
+  billTotal?: number;
+  billShares?: BillShare[];
+  checkedInIds?: string[];
 };
 
 export type PollOption = { id: string; label: string; voterIds: string[] };
@@ -88,7 +108,7 @@ export type DemoNotification = {
 };
 
 export type DemoAppState = {
-  version: 1;
+  version: 3;
   currentUser: UserProfile | null;
   profile: UserProfile;
   meetups: Meetup[];
@@ -109,14 +129,34 @@ export type MeetupDraft = {
   date: string;
   time: string;
   location: string;
+  district?: string;
   maxParticipants: number;
   paymentType: string;
   vibe: string[];
   description: string;
   isPublic: boolean;
+  alcoholType?: string;
+  menuNote?: string;
+  billNote?: string;
+  drinkLimit?: string;
+  ageConfirm?: boolean;
+  depositAmount?: number;
 };
 
-export const FILTERS = ['Tất cả', 'Tối nay', 'Gần đây', 'Karaoke', 'Chill', 'Rooftop', '2–4 người'] as const;
+export const ALCOHOL_TYPES = ['Bia hơi', 'Bia craft', 'Rượu', 'Cocktail', 'Không cồn', 'Mix'] as const;
+export const BILL_SPLITS = ['Chia đều (Campuchia)', 'Mỗi người tự trả', 'Host mời', 'Chia theo món', 'Thống nhất tại quán'] as const;
+export const DRINK_LIMITS = ['Vui là chính', 'Tối đa 3 lon', 'Tối đa 5 lon', 'Không ép uống', 'Tự lượng sức'] as const;
+export const NHAU_CATEGORIES = ['Nhậu', 'Bia', 'Quán ốc', 'Lẩu nướng', 'Rooftop bia', 'Ăn uống', 'Café', 'Board game', 'Karaoke', 'Networking', 'Khác'] as const;
+export const NHAU_SAFETY_TIPS = [
+  'Chỉ 18+ mới tham gia kèo có cồn.',
+  'Gặp ở quán công cộng, đông người.',
+  'Đã uống thì không lái xe — đặt Grab về.',
+  'Không ép uống, tôn trọng người uống không cồn.',
+] as const;
+
+export const DEPOSIT_OPTIONS = [0, 30000, 50000, 100000] as const;
+
+export const FILTERS = ['Tất cả', 'Tối nay', 'Gần đây', 'Nhậu', 'Bia', 'Rooftop', 'Quán ốc', 'Chill', '2–4 người'] as const;
 export type MeetupFilter = (typeof FILTERS)[number];
 export type MeetupSort = 'Gần nhất' | 'Sắp diễn ra' | 'Còn nhiều chỗ';
 
@@ -175,85 +215,162 @@ export function createSeedState(): DemoAppState {
   const profile: UserProfile = {
     ...people.minh,
     phone: '0901234567',
-    bio: 'Thích những quán café có nắng, sản phẩm công nghệ và các cuộc trò chuyện thật lòng.',
+    bio: 'Thích rooftop bia, quán ốc vỉa hè và nhóm nhỏ nói chuyện thật lòng. Uống có trách nhiệm.',
     city: 'TP. Hồ Chí Minh',
-    interests: ['Café', 'Startup', 'Rooftop', 'Board game', 'Nhóm nhỏ', 'Karaoke'],
+    interests: ['Nhậu', 'Bia', 'Rooftop', 'Quán ốc', 'Nhóm nhỏ', 'Karaoke'],
     dateOfBirth: '05-18-1997',
     verifiedPhone: true,
-    preferredVibes: ['Chill', 'Nhóm nhỏ', 'Networking'],
+    preferredVibes: ['Chill', 'Nhóm nhỏ', 'Vui vẻ'],
   };
   const users: DemoUser[] = [
-    { ...people.minh, bio: profile.bio, city: profile.city, interests: profile.interests, friendIds: [people.lan.id, people.tuan.id] },
-    { ...people.lan, bio: 'Mê karaoke, rooftop và những nhóm nhỏ dễ bắt chuyện.', city: 'TP. Hồ Chí Minh', interests: ['Karaoke', 'Rooftop', 'Café', 'Networking'], friendIds: [people.minh.id, people.tuan.id, people.mai.id] },
-    { ...people.tuan, bio: 'Board game, sản phẩm số và các cuộc trò chuyện không áp lực.', city: 'TP. Hồ Chí Minh', interests: ['Board game', 'Startup', 'Café'], friendIds: [people.minh.id, people.lan.id] },
-    { ...people.nam, bio: 'Thích chạy bộ nhẹ, ngắm hoàng hôn và gặp bạn mới.', city: 'TP. Thủ Đức', interests: ['Rooftop', 'Chạy bộ', 'Chill'], friendIds: [people.lan.id, people.mai.id] },
-    { ...people.ngoc, bio: 'Luôn tìm những quán café yên tĩnh và workshop cuối tuần.', city: 'TP. Hồ Chí Minh', interests: ['Café', 'Workshop', 'Nhóm nhỏ'], friendIds: [people.lan.id] },
-    { ...people.huy, bio: 'Thích khám phá quán ăn và chơi board game cùng nhóm nhỏ.', city: 'TP. Hồ Chí Minh', interests: ['Ăn uống', 'Board game'], friendIds: [] },
-    { ...people.mai, bio: 'Làm sáng tạo, thích workshop và những buổi café có nhiều câu chuyện.', city: 'TP. Hồ Chí Minh', interests: ['Workshop', 'Café', 'Networking', 'Rooftop'], friendIds: [people.lan.id, people.nam.id] },
+    { ...people.minh, bio: profile.bio, city: profile.city, interests: profile.interests, friendIds: [people.lan.id, people.tuan.id], reliabilityScore: 98, completedKeos: 24, noShowCount: 0 },
+    { ...people.lan, bio: 'Mê rooftop bia và quán ốc, không ép uống.', city: 'TP. Hồ Chí Minh', interests: ['Nhậu', 'Bia', 'Rooftop', 'Karaoke'], friendIds: [people.minh.id, people.tuan.id, people.mai.id], reliabilityScore: 96, completedKeos: 19, noShowCount: 1 },
+    { ...people.tuan, bio: 'Team bia craft, thích lai rai và board game.', city: 'TP. Hồ Chí Minh', interests: ['Bia', 'Nhậu', 'Board game'], friendIds: [people.minh.id, people.lan.id], reliabilityScore: 92, completedKeos: 15, noShowCount: 1 },
+    { ...people.nam, bio: 'Rooftop ngắm hoàng hôn, 2-3 lon là vui.', city: 'TP. Thủ Đức', interests: ['Rooftop', 'Bia', 'Chill'], friendIds: [people.lan.id, people.mai.id], reliabilityScore: 88, completedKeos: 11, noShowCount: 2 },
+    { ...people.ngoc, bio: 'Uống không cồn vẫn chill, mê quán ốc.', city: 'TP. Hồ Chí Minh', interests: ['Quán ốc', 'Không cồn', 'Nhóm nhỏ'], friendIds: [people.lan.id], reliabilityScore: 99, completedKeos: 17, noShowCount: 0 },
+    { ...people.huy, bio: 'Thích khám phá quán nhậu và lẩu bò.', city: 'TP. Hồ Chí Minh', interests: ['Nhậu', 'Lẩu nướng'], friendIds: [], reliabilityScore: 65, completedKeos: 4, noShowCount: 3 },
+    { ...people.mai, bio: 'Rủ kèo bia craft cuối tuần, ai cũng welcome.', city: 'TP. Hồ Chí Minh', interests: ['Bia', 'Nhậu', 'Rooftop'], friendIds: [people.lan.id, people.nam.id], reliabilityScore: 94, completedKeos: 13, noShowCount: 0 },
   ];
   const meetups: Meetup[] = [
     {
-      id: 'startup-chill', title: 'Startup & chill', category: 'Networking', date: localIso(0), dateLabel: 'Tối nay', time: '19:30',
+      id: 'nhau-rooftop-toi-nay', title: 'Rooftop bia sau giờ làm', category: 'Rooftop bia', date: localIso(0), dateLabel: 'Tối nay', time: '19:30',
+      location: 'Chạng Vạng Rooftop', district: 'Bình Thạnh', distanceKm: 1.2, hostId: people.minh.id, hostName: people.minh.name,
+      hostAvatar: 'profile-minh-anh', hostAvatarColor: people.minh.avatarColor, hostVerified: true,
+      participants: [people.minh, people.lan, people.nam, people.ngoc], maxParticipants: 6,
+      vibe: ['Chill', 'Rooftop', 'Nhậu'], paymentType: 'Chia đều (Campuchia)',
+      description: 'Lai rai 2-3 lon ngắm Sài Gòn lên đèn. Có option không cồn, không ép uống. Ai say thì đặt Grab về chung.',
+      status: 'upcoming', isPublic: true, image: 'rooftop', color: '#F28C28',
+      alcoholType: 'Bia hơi', menuItems: [{ name: 'Bia hơi', price: 25000 }, { name: 'Mồi lai rai', price: 89000 }],
+      billNote: 'Campuchia tại bàn, khoảng 120k/người.', drinkLimit: 'Tự lượng sức', age18Plus: true,
+      mapQuery: 'Chạng Vạng Rooftop Bình Thạnh', tableBooked: true,
+      depositAmount: 50000, billTotal: 680000,
+      billShares: [
+        { userId: people.minh.id, amount: 170000, paid: true, checkedIn: true },
+        { userId: people.lan.id, amount: 170000, paid: true, checkedIn: true },
+        { userId: people.nam.id, amount: 170000, paid: false, checkedIn: true },
+        { userId: people.ngoc.id, amount: 170000, paid: false, checkedIn: false },
+      ],
+      checkedInIds: [people.minh.id, people.lan.id, people.nam.id],
+    },
+    {
+      id: 'quan-oc-quan-1', title: 'Quán ốc vỉa hè Quận 1', category: 'Quán ốc', date: localIso(0), dateLabel: 'Tối nay', time: '18:30',
+      location: 'Ốc Đào Nguyễn Trãi', district: 'Quận 1', distanceKm: 0.8, hostId: people.ngoc.id, hostName: people.ngoc.name,
+      hostAvatar: 'ngoc', hostAvatarColor: people.ngoc.avatarColor, hostVerified: false,
+      participants: [people.ngoc, people.lan], maxParticipants: 4,
+      vibe: ['Nhậu', 'Quán ốc', 'Nhóm nhỏ'], paymentType: 'Chia theo món',
+      description: 'Team ốc len xào dừa + nghêu hấp sả. Mỗi người gọi 1-2 món share cả bàn. Quán đông vui, dễ bắt chuyện.',
+      status: 'upcoming', isPublic: true, image: 'dinner', color: '#C86D46',
+      alcoholType: 'Bia hơi', menuItems: [{ name: 'Ốc len xào dừa', price: 95000 }, { name: 'Nghêu hấp sả', price: 75000 }, { name: 'Bia Tiger', price: 23000 }],
+      billNote: 'Ai gọi món nào note lại, share tiền mồi + bia riêng.', drinkLimit: 'Không ép uống', age18Plus: true,
+      mapQuery: 'Ốc Đào Nguyễn Trãi Quận 1', tableBooked: false,
+      depositAmount: 30000, checkedInIds: [],
+    },
+    {
+      id: 'bia-craft-thao-dien', title: 'Bia craft Thảo Điền', category: 'Bia', date: localIso(1), dateLabel: 'Ngày mai', time: '19:00',
+      location: 'Heart of Darkness', district: 'TP. Thủ Đức', distanceKm: 5.6, hostId: people.tuan.id, hostName: people.tuan.name,
+      hostAvatar: 'tuan', hostAvatarColor: people.tuan.avatarColor, hostVerified: true,
+      participants: [people.tuan, people.minh, people.huy, people.ngoc, people.nam], maxParticipants: 8,
+      vibe: ['Bia', 'Nhậu', 'Người mới'], paymentType: 'Mỗi người tự trả',
+      description: 'Thử flight 4 loại craft + khoai chiên. Hợp cho người mới, host sẽ giới thiệu từng vị.',
+      status: 'upcoming', isPublic: true, image: 'games', color: '#F4B400',
+      alcoholType: 'Bia craft', menuItems: [{ name: 'Flight 4 ly', price: 180000 }, { name: 'Khoai chiên', price: 90000 }],
+      billNote: 'Tự trả phần mình.', drinkLimit: 'Tối đa 5 lon', age18Plus: true,
+      mapQuery: 'Heart of Darkness Thảo Điền', tableBooked: true,
+    },
+    {
+      id: 'lau-bo-cuoi-tuan', title: 'Lẩu bò + vài lon cuối tuần', category: 'Lẩu nướng', date: localIso(saturday), dateLabel: 'Thứ Bảy', time: '18:00',
+      location: 'Lẩu Bò Cô Thảo', district: 'Quận 3', distanceKm: 2.1, hostId: people.lan.id, hostName: people.lan.name,
+      hostAvatar: 'lan', hostAvatarColor: people.lan.avatarColor, hostVerified: true,
+      participants: [people.lan, people.minh, people.huy, people.ngoc], maxParticipants: 6,
+      vibe: ['Nhậu', 'Vui vẻ', 'Nhóm nhỏ'], paymentType: 'Chia đều (Campuchia)',
+      description: 'Nồi lẩu bò 4 người + rau thêm thoải mái. Uống lai rai, ai không uống có trà đá/soda.',
+      status: 'upcoming', isPublic: true, image: 'dinner', color: '#D97733',
+      alcoholType: 'Bia hơi', menuItems: [{ name: 'Lẩu bò nhỏ', price: 280000 }, { name: 'Bia Saigon', price: 20000 }],
+      billNote: 'Chia đều cả lẩu + nước.', drinkLimit: 'Tối đa 3 lon', age18Plus: true,
+      mapQuery: 'Lẩu Bò Cô Thảo Quận 3', tableBooked: false,
+    },
+    {
+      id: 'startup-chill', title: 'Startup & chill (không cồn)', category: 'Networking', date: localIso(0), dateLabel: 'Tối nay', time: '19:30',
       location: 'The Workshop Coffee', district: 'Quận 1', distanceKm: 1.2, hostId: people.minh.id, hostName: people.minh.name,
       hostAvatar: 'profile-minh-anh', hostAvatarColor: people.minh.avatarColor, hostVerified: true,
       participants: [people.minh, people.lan, people.nam, people.ngoc], maxParticipants: 6,
       vibe: ['Chill', 'Rooftop', 'Networking'], paymentType: 'Mỗi người tự trả',
-      description: 'Một buổi trò chuyện nhỏ cho người làm sản phẩm, công nghệ và startup. Không cần uống đồ có cồn.',
+      description: 'Option cho ai không nhậu: café trò chuyện sản phẩm/startup. Tách riêng với team bia.',
       status: 'upcoming', isPublic: true, image: 'rooftop', color: '#F28C28',
+      alcoholType: 'Không cồn', menuItems: [{ name: 'Cà phê', price: 55000 }],
+      billNote: 'Tự trả.', drinkLimit: 'Vui là chính', age18Plus: false,
+      mapQuery: 'The Workshop Coffee Quận 1', tableBooked: false,
     },
     {
-      id: 'boardgame-weekend', title: 'Board game cuối tuần', category: 'Board game', date: localIso(saturday), dateLabel: 'Thứ Bảy', time: '18:00',
+      id: 'boardgame-weekend', title: 'Board game + bia nhẹ', category: 'Board game', date: localIso(saturday), dateLabel: 'Thứ Bảy', time: '18:00',
       location: 'Meeple House', district: 'Bình Thạnh', distanceKm: 3.4, hostId: people.tuan.id, hostName: people.tuan.name,
       hostAvatar: 'tuan', hostAvatarColor: people.tuan.avatarColor, hostVerified: true,
       participants: [people.tuan, people.minh, people.huy, people.ngoc, people.nam], maxParticipants: 8,
-      vibe: ['Board game', 'Nhóm nhỏ', 'Người mới'], paymentType: 'Chia đều',
-      description: 'Chơi Codenames, Avalon và vài game nhẹ. Nhóm luôn dành thời gian hướng dẫn người mới.',
+      vibe: ['Board game', 'Nhóm nhỏ', 'Người mới'], paymentType: 'Chia đều (Campuchia)',
+      description: 'Chơi Avalon/Codenames, ai thua uống 1 hớp (có soda cho người không uống).',
       status: 'upcoming', isPublic: true, image: 'games', color: '#F4B400',
+      alcoholType: 'Mix', menuItems: [{ name: 'Combo board game + 1 nước', price: 99000 }],
+      billNote: 'Chia đều phí bàn.', drinkLimit: 'Không ép uống', age18Plus: true,
+      mapQuery: 'Meeple House Bình Thạnh', tableBooked: true,
     },
     {
-      id: 'karaoke-friday', title: 'Karaoke không áp lực', category: 'Karaoke', date: localIso(friday), dateLabel: 'Thứ Sáu', time: '20:00',
+      id: 'karaoke-friday', title: 'Karaoke + bia sau nhậu', category: 'Karaoke', date: localIso(friday), dateLabel: 'Thứ Sáu', time: '20:00',
       location: 'Nnice Võ Văn Tần', district: 'Quận 3', distanceKm: 2.1, hostId: people.lan.id, hostName: people.lan.name,
       hostAvatar: 'lan', hostAvatarColor: people.lan.avatarColor, hostVerified: true,
       participants: [people.lan, people.minh, people.huy, people.ngoc], maxParticipants: 6,
-      vibe: ['Karaoke', 'Vui vẻ', 'Không áp lực'], paymentType: 'Chia đều',
-      description: 'Đi hát và làm quen bạn mới. Có đồ uống không cồn, tôn trọng lựa chọn của mọi người.',
+      vibe: ['Karaoke', 'Vui vẻ', 'Nhậu'], paymentType: 'Chia đều (Campuchia)',
+      description: 'Tăng 2 sau kèo ốc/lẩu. Hát + lai rai nhẹ, tôn trọng người không uống.',
       status: 'upcoming', isPublic: true, image: 'karaoke', color: '#D97733',
+      alcoholType: 'Bia hơi', menuItems: [{ name: 'Giờ hát', price: 120000 }, { name: 'Snack', price: 60000 }],
+      billNote: 'Chia giờ hát + nước.', drinkLimit: 'Tự lượng sức', age18Plus: true,
+      mapQuery: 'Nnice Karaoke Võ Văn Tần Quận 3', tableBooked: false,
     },
     {
-      id: 'coffee-weekend', title: 'Café nói chuyện cuối tuần', category: 'Café', date: localIso(saturday), dateLabel: 'Thứ Bảy', time: '09:30',
+      id: 'coffee-weekend', title: 'Café giải ngán cuối tuần', category: 'Café', date: localIso(saturday), dateLabel: 'Thứ Bảy', time: '09:30',
       location: 'Okkio Caffe', district: 'Quận 1', distanceKm: 0.8, hostId: people.ngoc.id, hostName: people.ngoc.name,
       hostAvatar: 'ngoc', hostAvatarColor: people.ngoc.avatarColor, hostVerified: false,
       participants: [people.ngoc, people.lan], maxParticipants: 4,
       vibe: ['Chill', 'Café', 'Nhóm nhỏ'], paymentType: 'Mỗi người tự trả',
-      description: 'Một bàn café nhỏ cho những ai muốn trò chuyện chậm rãi và làm quen bạn mới.',
+      description: 'Sáng hôm sau của team nhậu: café trứng + kể chuyện tối qua.',
       status: 'upcoming', isPublic: true, image: 'coffee', color: '#A66A3F',
+      alcoholType: 'Không cồn', menuItems: [{ name: 'Cà phê trứng', price: 65000 }],
+      billNote: 'Tự trả.', drinkLimit: 'Vui là chính', age18Plus: false,
+      mapQuery: 'Okkio Caffe Quận 1', tableBooked: false,
     },
     {
-      id: 'rooftop-sunset', title: 'Rooftop chill ngắm hoàng hôn', category: 'Rooftop', date: localIso(0), dateLabel: 'Tối nay', time: '17:45',
+      id: 'rooftop-sunset', title: 'Rooftop chill ngắm hoàng hôn', category: 'Rooftop bia', date: localIso(0), dateLabel: 'Tối nay', time: '17:45',
       location: 'Chạng Vạng Rooftop', district: 'Bình Thạnh', distanceKm: 2.7, hostId: people.nam.id, hostName: people.nam.name,
       hostAvatar: 'nam', hostAvatarColor: people.nam.avatarColor, hostVerified: true,
       participants: [people.nam, people.tuan, people.lan], maxParticipants: 5,
-      vibe: ['Rooftop', 'Chill', 'Người mới'], paymentType: 'Mỗi người tự trả',
-      description: 'Gặp nhau trước hoàng hôn, chọn một góc thoáng và nói chuyện nhẹ nhàng sau giờ làm.',
+      vibe: ['Rooftop', 'Chill', 'Nhậu'], paymentType: 'Mỗi người tự trả',
+      description: 'Happy hour 17-19h giảm 20% bia. Đến sớm giữ bàn view sông.',
       status: 'upcoming', isPublic: true, image: 'rooftop', color: '#E89B45',
+      alcoholType: 'Cocktail', menuItems: [{ name: 'Cocktail hoàng hôn', price: 110000 }, { name: 'Bia happy hour', price: 35000 }],
+      billNote: 'Tự trả, giữ bill để campuchia nếu muốn.', drinkLimit: 'Tối đa 3 lon', age18Plus: true,
+      mapQuery: 'Chạng Vạng Rooftop Bình Thạnh', tableBooked: true,
     },
     {
       id: 'small-dinner', title: 'Đi ăn tối nhóm nhỏ', category: 'Ăn uống', date: localIso(1), dateLabel: 'Ngày mai', time: '19:00',
       location: 'Bếp Mẹ Ỉn', district: 'Quận 1', distanceKm: 1.9, hostId: people.huy.id, hostName: people.huy.name,
       hostAvatar: 'huy', hostAvatarColor: people.huy.avatarColor, hostVerified: false,
       participants: [people.huy, people.nam], maxParticipants: 4,
-      vibe: ['Ăn uống', 'Nhóm nhỏ', 'Vui vẻ'], paymentType: 'Chia đều',
-      description: 'Thử vài món Việt, mỗi người gọi một món để cả bàn cùng chia sẻ và trò chuyện.',
+      vibe: ['Ăn uống', 'Nhóm nhỏ', 'Vui vẻ'], paymentType: 'Chia đều (Campuchia)',
+      description: 'Mở bát nhẹ trước khi qua quán bia kế bên. Mỗi người gọi 1 món share cả bàn.',
       status: 'upcoming', isPublic: true, image: 'dinner', color: '#C86D46',
+      alcoholType: 'Không cồn', menuItems: [{ name: 'Cơm nhà share', price: 120000 }],
+      billNote: 'Chia đều.', drinkLimit: 'Vui là chính', age18Plus: false,
+      mapQuery: 'Bếp Mẹ Ỉn Quận 1', tableBooked: false,
     },
     {
-      id: 'easy-run', title: 'Chạy bộ nhẹ buổi chiều', category: 'Khác', date: localIso(2), dateLabel: labelForOffset(2), time: '17:30',
+      id: 'easy-run', title: 'Chạy bộ giải bia buổi chiều', category: 'Khác', date: localIso(2), dateLabel: labelForOffset(2), time: '17:30',
       location: 'Công viên Bờ sông Sài Gòn', district: 'TP. Thủ Đức', distanceKm: 5.6, hostId: people.nam.id, hostName: people.nam.name,
       hostAvatar: 'nam', hostAvatarColor: people.nam.avatarColor, hostVerified: true,
       participants: [people.nam, people.huy, people.tuan], maxParticipants: 8,
       vibe: ['Người mới', 'Vui vẻ'], paymentType: 'Miễn phí',
-      description: 'Chạy pace dễ trong khoảng 4 km, có nghỉ giữa đường. Người mới bắt đầu hoàn toàn có thể tham gia.',
+      description: 'Kèo giải ngán sau cuối tuần nhậu: chạy 4km pace nhẹ, xong uống nước mía.',
       status: 'upcoming', isPublic: true, image: 'running', color: '#6C9A68',
+      alcoholType: 'Không cồn', menuItems: [], billNote: 'Miễn phí.', drinkLimit: 'Vui là chính', age18Plus: false,
+      mapQuery: 'Công viên Bờ sông Sài Gòn', tableBooked: false,
     },
     {
       id: 'creative-workshop', title: 'Workshop sáng tạo cuối tuần', category: 'Khác', date: localIso(sunday), dateLabel: 'Chủ Nhật', time: '14:00',
@@ -261,11 +378,26 @@ export function createSeedState(): DemoAppState {
       hostAvatar: 'lan', hostAvatarColor: people.lan.avatarColor, hostVerified: true,
       participants: [people.lan, people.ngoc, people.minh], maxParticipants: 10,
       vibe: ['Networking', 'Người mới', 'Vui vẻ'], paymentType: '120.000đ/người',
-      description: 'Mang một ý tưởng nhỏ đến workshop, cùng phác thảo và nhận góp ý trong không khí thân thiện.',
+      description: 'Mang một ý tưởng quán nhậu trong mơ đến workshop, cùng phác thảo menu.',
       status: 'upcoming', isPublic: true, image: 'workshop', color: '#8A74A5',
+      alcoholType: 'Không cồn', menuItems: [], billNote: '120k/người.', drinkLimit: 'Vui là chính', age18Plus: false,
+      mapQuery: 'The Lab Saigon Quận 3', tableBooked: false,
     },
   ];
   const chats: ChatRoom[] = [
+    {
+      meetupId: 'nhau-rooftop-toi-nay', unread: 2, onlineCount: 3,
+      messages: [
+        message('msg-nhau-1', people.lan, 'Tối nay ngồi bàn view sông nha, mình đặt bàn rồi.', at(0, 18, 20)),
+        message('msg-nhau-2', people.nam, 'Mình tới sớm 10p giữ chỗ, ai tới cứ nhắn nhé! Ai không uống có soda.', at(0, 18, 42)),
+      ],
+    },
+    {
+      meetupId: 'quan-oc-quan-1', unread: 1, onlineCount: 2,
+      messages: [
+        message('msg-oc-1', people.ngoc, 'Quán đông, mọi người tới trước 18h45 nha. Ốc len hết sớm lắm.', at(0, 17, 30)),
+      ],
+    },
     {
       meetupId: 'startup-chill', unread: 2, onlineCount: 3,
       messages: [
@@ -291,7 +423,7 @@ export function createSeedState(): DemoAppState {
     },
   ];
   return {
-    version: 1,
+    version: 3,
     currentUser: null,
     profile,
     meetups,
@@ -307,10 +439,10 @@ export function createSeedState(): DemoAppState {
     receivedFriendRequestIds: [people.ngoc.id],
     blockedUsers: [people.huy],
     notifications: [
-      { id: 'notification-request', type: 'friend_request', title: 'Ngọc Anh đã gửi lời mời kết bạn', description: 'Hai bạn cùng tham gia Board game cuối tuần.', createdAt: minutesAgo(12), read: false, userId: people.ngoc.id },
-      { id: 'notification-friend', type: 'friend_accepted', title: 'Lan Chi đã chấp nhận lời mời kết bạn', description: 'Hai bạn giờ đã có thể theo dõi các meetup chung.', createdAt: minutesAgo(85), read: false, userId: people.lan.id },
-      { id: 'notification-meetup', type: 'meetup', title: 'Bạn đã được thêm vào kèo Startup & chill', description: 'Meetup bắt đầu lúc 19:30 tại Quận 1.', createdAt: minutesAgo(260), read: true, meetupId: 'startup-chill' },
-      { id: 'notification-chat', type: 'chat', title: 'Có tin nhắn mới trong Board game cuối tuần', description: 'Tuấn Nguyễn: Mình đã đặt bàn rồi nhé.', createdAt: minutesAgo(1440), read: false, meetupId: 'boardgame-weekend' },
+      { id: 'notification-request', type: 'friend_request', title: 'Ngọc Anh đã gửi lời mời kết bạn', description: 'Hai bạn cùng tham gia Board game + bia nhẹ.', createdAt: minutesAgo(12), read: false, userId: people.ngoc.id },
+      { id: 'notification-friend', type: 'friend_accepted', title: 'Lan Chi đã chấp nhận lời mời kết bạn', description: 'Hai bạn giờ đã có thể theo dõi các kèo nhậu chung.', createdAt: minutesAgo(85), read: false, userId: people.lan.id },
+      { id: 'notification-meetup', type: 'meetup', title: 'Bạn đã được thêm vào kèo Rooftop bia sau giờ làm', description: 'Kèo bắt đầu lúc 19:30 tại Bình Thạnh.', createdAt: minutesAgo(260), read: true, meetupId: 'nhau-rooftop-toi-nay' },
+      { id: 'notification-chat', type: 'chat', title: 'Có tin nhắn mới trong Quán ốc vỉa hè Quận 1', description: 'Ngọc Anh: Quán đông, mọi người tới trước 18h45 nha.', createdAt: minutesAgo(1440), read: false, meetupId: 'quan-oc-quan-1' },
     ],
     notificationsEnabled: true,
   };
@@ -322,20 +454,22 @@ function normalize(value: string) {
 
 export function meetupPreferenceScore(meetup: Meetup, interests: string[], preferredVibes: string[]) {
   const preferences = new Set([...interests, ...preferredVibes].map(normalize));
-  return [meetup.category, ...meetup.vibe].reduce((score, value) => score + (preferences.has(normalize(value)) ? 1 : 0), 0);
+  return [meetup.category, meetup.alcoholType ?? '', ...meetup.vibe].reduce((score, value) => score + (value && preferences.has(normalize(value)) ? 1 : 0), 0);
 }
 
 export function filterAndSortMeetups(meetups: Meetup[], query: string, filters: string[], sort: MeetupSort = 'Gần nhất') {
   const needle = normalize(query);
   const filtered = meetups.filter((meetup) => {
-    const haystack = normalize(`${meetup.title} ${meetup.category} ${meetup.location} ${meetup.district} ${meetup.vibe.join(' ')}`);
+    const haystack = normalize(`${meetup.title} ${meetup.category} ${meetup.alcoholType ?? ''} ${meetup.location} ${meetup.district} ${meetup.vibe.join(' ')} ${(meetup.menuItems ?? []).map((m) => m.name).join(' ')}`);
     if (needle && !haystack.includes(needle)) return false;
     return filters.every((filter) => {
       if (filter === 'Tất cả') return true;
       if (filter === 'Tối nay') return meetup.dateLabel === 'Tối nay';
       if (filter === 'Gần đây') return meetup.distanceKm <= 3;
       if (filter === '2–4 người') return meetup.maxParticipants <= 4;
-      return normalize(meetup.category) === normalize(filter) || meetup.vibe.some((item) => normalize(item) === normalize(filter));
+      const norm = normalize(filter);
+      if (norm === 'nhau') return normalize(meetup.category).includes('nhau') || meetup.vibe.some((v) => normalize(v).includes('nhau')) || (meetup.alcoholType ?? '').length > 0;
+      return normalize(meetup.category) === norm || normalize(meetup.alcoholType ?? '') === norm || meetup.vibe.some((item) => normalize(item) === norm);
     });
   });
   return [...filtered].sort((a, b) => {
@@ -360,6 +494,43 @@ export function meetupDateLabel(date: string) {
 
 export function formatDistance(distanceKm: number) {
   return `${distanceKm.toFixed(1).replace('.', ',')} km`;
+}
+
+export function formatVND(value: number) {
+  return `${value.toLocaleString('vi-VN')}đ`;
+}
+
+export function buildMapUrl(query?: string) {
+  if (!query) return undefined;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${query}, TP. Hồ Chí Minh`)}`;
+}
+
+export function estimateBillPerPerson(meetup: Pick<Meetup, 'menuItems' | 'participants' | 'maxParticipants'>) {
+  const total = (meetup.menuItems ?? []).reduce((sum, item) => sum + item.price, 0);
+  const count = Math.max(1, meetup.participants.length);
+  if (!total) return null;
+  return Math.round(total * (meetup.maxParticipants > 4 ? 1.5 : 1) / count);
+}
+
+export function calcCampuchiaShares(total: number, userIds: string[]): BillShare[] {
+  if (!userIds.length || total <= 0) return [];
+  const base = Math.floor(total / userIds.length);
+  const remainder = total - base * userIds.length;
+  return userIds.map((userId, idx) => ({
+    userId,
+    amount: base + (idx < remainder ? 1 : 0),
+    paid: false,
+    checkedIn: false,
+  }));
+}
+
+export function unpaidShares(meetup: Pick<Meetup, 'billShares'>) {
+  return (meetup.billShares ?? []).filter((s) => !s.paid);
+}
+
+export function formatTrust(score?: number) {
+  if (score == null) return 'Mới';
+  return `${score}% uy tín`;
 }
 
 export function formatDate(date: string) {

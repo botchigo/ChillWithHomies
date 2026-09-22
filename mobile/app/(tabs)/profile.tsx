@@ -20,7 +20,7 @@ import { useDemoApp } from '@/context/demo-app-context';
 import { formatDate, type DemoUser, type Meetup, type Review } from '@/data/demo-data';
 
 const avatar = require('@/assets/images/profile-minh-anh.png');
-const INTERESTS = ['Café', 'Startup', 'Rooftop', 'Board game', 'Nhóm nhỏ', 'Karaoke', 'Networking', 'Ăn uống'];
+const INTERESTS = ['Nhậu', 'Bia', 'Quán ốc', 'Rooftop', 'Lẩu nướng', 'Café', 'Board game', 'Nhóm nhỏ', 'Karaoke', 'Networking'];
 const REPORT_TYPES = ['An toàn', 'Hành vi', 'Thông tin sai', 'Khác'];
 type SheetName = 'edit' | 'interests' | 'hosted' | 'reviews' | 'safety' | 'blocked' | 'report' | 'settings' | null;
 
@@ -228,11 +228,13 @@ export default function ProfileScreen() {
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={sheet === 'safety'} title="Trung tâm an toàn" onClose={closeSheet}>
+      <BottomSheet visible={sheet === 'safety'} title="An toàn kèo nhậu" onClose={closeSheet}>
         <View style={styles.sheetContent}>
-          <SafetyTip icon="map-marker" title="Gặp ở nơi công cộng" text="Ưu tiên quán café, nhà hàng hoặc không gian đông người và dễ tìm." />
-          <SafetyTip icon="share-alt" title="Chia sẻ kế hoạch" text="Báo cho người thân biết địa điểm và thời gian bạn dự kiến trở về." />
-          <SafetyTip icon="hand-stop-o" title="Tin vào cảm nhận của bạn" text="Bạn luôn có thể rời meetup hoặc báo cáo nếu thấy không thoải mái." />
+          <SafetyTip icon="id-card" title="18+ mới nhậu" text="Kèo có cồn chỉ dành cho người đủ 18 tuổi. Không ép uống." />
+          <SafetyTip icon="map-marker" title="Quán công cộng, đông người" text="Ưu tiên quán ốc, rooftop, bia hơi dễ tìm, dễ về." />
+          <SafetyTip icon="cab" title="Đã uống không lái xe" text="Đặt Grab về chung, share bill Grab trong chat nhóm." />
+          <SafetyTip icon="share-alt" title="Chia sẻ kế hoạch" text="Gửi vị trí quán + giờ về dự kiến cho người thân." />
+          <SafetyTip icon="hand-stop-o" title="Không ép uống" text="Luôn có option không cồn. Bạn có thể rời kèo bất cứ lúc nào." />
           <AppButton label="Đã hiểu" variant="secondary" onPress={closeSheet} />
         </View>
       </BottomSheet>

@@ -11,11 +11,16 @@ import type { ChatMessage } from '@/data/demo-data';
 
 const ETA_OPTIONS = [5, 10, 15, 30];
 const DEMO_LOCATIONS = [
-  { name: 'Bưu điện Thành phố', address: '2 Công xã Paris, Quận 1' },
-  { name: 'Phố đi bộ Nguyễn Huệ', address: 'Nguyễn Huệ, Quận 1' },
+  { name: 'Ốc Đào Nguyễn Trãi', address: 'Quận 1 · Ốc len xào dừa' },
+  { name: 'Heart of Darkness', address: 'Thảo Điền · Bia craft' },
+];
+const POLL_TEMPLATES = [
+  { q: 'Tối nay uống gì?', a: 'Bia hơi', b: 'Không cồn' },
+  { q: 'Ngồi ở đâu?', a: 'Bàn trong nhà', b: 'Bàn ngoài trời' },
+  { q: 'Chốt món gì?', a: 'Ốc len xào dừa', b: 'Nghêu hấp sả' },
 ];
 
-type Sheet = 'poll' | 'location' | 'eta' | null;
+type Sheet = 'poll' | 'location' | 'eta' | 'bill' | null;
 
 function timeLabel(value: string) {
   return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -25,13 +30,16 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ meetupId: string }>();
   const meetupId = Array.isArray(params.meetupId) ? params.meetupId[0] : params.meetupId;
-  const { state, hydrated, sendMessage, sendLocation, sendEta, createPoll, votePoll, markRoomRead, ensureChatRoom, notify } = useDemoApp();
+  const { state, hydrated, sendMessage, sendLocation, sendEta, createPoll, votePoll, markRoomRead, ensureChatRoom, sendBillNote, checkIn, setBillTotal, sendSafetySignal, notify } = useDemoApp();
   const [text, setText] = useState('');
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [pollQuestion, setPollQuestion] = useState('');
-  const [pollOptionA, setPollOptionA] = useState('');
-  const [pollOptionB, setPollOptionB] = useState('');
+  const [pollQuestion, setPollQuestion] = useState(POLL_TEMPLATES[0].q);
+  const [pollOptionA, setPollOptionA] = useState(POLL_TEMPLATES[0].a);
+  const [pollOptionB, setPollOptionB] = useState(POLL_TEMPLATES[0].b);
   const [pollError, setPollError] = useState('');
+  const [billText, setBillText] = useState('');
+  const [billTotal, setBillTotalInput] = useState('');
+  const [billError, setBillError] = useState('');
   const messageList = useRef<ScrollView>(null);
 
   const meetup = state.meetups.find((item) => item.id === meetupId);
@@ -128,6 +136,42 @@ export default function ChatRoomScreen() {
     setSheet(null);
   };
 
+  const submitBill = () => {
+    const total = Number(billTotal.replace(/[^\d]/g, ''));
+    if (billTotal.trim() && (!total || total <= 0)) {
+      setBillError('Tổng bill chưa đúng. Ví dụ 850000.');
+      return;
+    }
+    if (total > 0) {
+      const isHost = meetup.hostId === currentUser?.id;
+      if (!isHost) {
+        setBillError('Chỉ host mới được nhập tổng bill. Bạn ghi note bên dưới nhé.');
+        return;
+      }
+      const res = setBillTotal(meetup.id, total);
+      if (!res.ok) {
+        setBillError(res.error ?? 'Không thể chốt bill.');
+        return;
+      }
+    }
+    if (billText.trim()) {
+      const result = sendBillNote(meetup.id, billText);
+      if (!result.ok) {
+        setBillError(result.error ?? 'Không thể chốt bill.');
+        return;
+      }
+    }
+    if (!billText.trim() && !(total > 0)) {
+      setBillError('Nhập tổng bill hoặc ghi chú chia tiền.');
+      return;
+    }
+    setBillText('');
+    setBillTotalInput('');
+    setBillError('');
+    setSheet(null);
+    notify('Đã chốt bill cho cả nhóm.');
+  };
+
   const locations = [{ name: meetup.location, address: meetup.district }, ...DEMO_LOCATIONS.filter((item) => item.name !== meetup.location)];
 
   return (
@@ -152,9 +196,12 @@ export default function ChatRoomScreen() {
 
         <View style={styles.quickBar}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickContent}>
-            <QuickAction icon="bar-chart" label="Tạo bình chọn" onPress={() => setSheet('poll')} />
-            <QuickAction icon="map-marker" label="Gửi vị trí" onPress={() => setSheet('location')} />
-            <QuickAction icon="clock-o" label="Báo ETA" onPress={() => setSheet('eta')} />
+            <QuickAction icon="bar-chart" label="Vote món" onPress={() => setSheet('poll')} />
+            <QuickAction icon="map-marker" label="Vị trí quán" onPress={() => setSheet('location')} />
+            <QuickAction icon="clock-o" label="Báo giờ tới" onPress={() => setSheet('eta')} />
+            <QuickAction icon="money" label="Chốt bill" onPress={() => setSheet('bill')} />
+            <QuickAction icon="check" label="Check-in" onPress={() => { const r = checkIn(meetup.id); if (!r.ok && r.error) notify(r.error); }} />
+            <QuickAction icon="cab" label="Grab về" onPress={() => { const r = sendSafetySignal(meetup.id, 'grab'); if (!r.ok && r.error) notify(r.error); }} />
           </ScrollView>
         </View>
 
@@ -166,8 +213,8 @@ export default function ChatRoomScreen() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => messageList.current?.scrollToEnd({ animated: false })}
         >
-          <View style={styles.datePill}><Text style={styles.dateText}>NHÓM MEETUP</Text></View>
-          <View style={styles.safetyNote}><FontAwesome name="lock" size={12} color={AppColors.success} /><Text style={styles.safetyText}>Chỉ host và thành viên đã tham gia mới xem được nội dung này.</Text></View>
+          <View style={styles.datePill}><Text style={styles.dateText}>NHÓM NHẬU · 18+</Text></View>
+          <View style={styles.safetyNote}><FontAwesome name="cab" size={12} color={AppColors.success} /><Text style={styles.safetyText}>Đã uống không lái xe. Không ép uống, có option không cồn.</Text></View>
           {room.messages.map((message) => message.type === 'system' ? (
             <View key={message.id} style={styles.systemMessage}><FontAwesome name="info-circle" size={12} color={AppColors.textSecondary} /><Text style={styles.systemText}>{message.text}</Text></View>
           ) : (
@@ -202,14 +249,26 @@ export default function ChatRoomScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      <BottomSheet visible={sheet === 'poll'} title="Tạo bình chọn" onClose={() => { setSheet(null); setPollError(''); }}>
+      <BottomSheet visible={sheet === 'poll'} title="Vote món nhậu" onClose={() => { setSheet(null); setPollError(''); }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.sheetForm}>
-            <AppInput label="Câu hỏi" value={pollQuestion} onChangeText={(value) => { setPollQuestion(value); setPollError(''); }} placeholder="Ví dụ: Cả nhóm ngồi ở đâu?" maxLength={120} />
-            <AppInput label="Lựa chọn 1" value={pollOptionA} onChangeText={(value) => { setPollOptionA(value); setPollError(''); }} placeholder="Bàn trong nhà" maxLength={60} />
-            <AppInput label="Lựa chọn 2" value={pollOptionB} onChangeText={(value) => { setPollOptionB(value); setPollError(''); }} placeholder="Bàn ngoài trời" maxLength={60} />
+            <View style={styles.templateRow}>{POLL_TEMPLATES.map((t) => <Pressable key={t.q} onPress={() => { setPollQuestion(t.q); setPollOptionA(t.a); setPollOptionB(t.b); setPollError(''); }} style={styles.templateChip}><Text style={styles.templateText}>{t.q}</Text></Pressable>)}</View>
+            <AppInput label="Câu hỏi" value={pollQuestion} onChangeText={(value) => { setPollQuestion(value); setPollError(''); }} placeholder="Ví dụ: Tối nay uống gì?" maxLength={120} />
+            <AppInput label="Lựa chọn 1" value={pollOptionA} onChangeText={(value) => { setPollOptionA(value); setPollError(''); }} placeholder="Bia hơi" maxLength={60} />
+            <AppInput label="Lựa chọn 2" value={pollOptionB} onChangeText={(value) => { setPollOptionB(value); setPollError(''); }} placeholder="Không cồn" maxLength={60} />
             {pollError ? <Text accessibilityRole="alert" style={styles.error}>{pollError}</Text> : null}
-            <AppButton label="Gửi bình chọn" icon="bar-chart" onPress={submitPoll} />
+            <AppButton label="Gửi bình chọn" icon="beer" onPress={submitPoll} />
+          </View>
+        </KeyboardAvoidingView>
+      </BottomSheet>
+
+      <BottomSheet visible={sheet === 'bill'} title="Chốt bill nhậu" onClose={() => { setSheet(null); setBillError(''); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.sheetForm}>
+            {meetup.hostId === currentUser?.id ? <AppInput label="Tổng bill (VND) — host nhập" value={billTotal} onChangeText={(v) => { setBillTotalInput(v); setBillError(''); }} keyboardType="number-pad" placeholder="850000" maxLength={10} /> : <Text style={styles.safetyText}>Chỉ host nhập tổng bill. Bạn ghi note bên dưới.</Text>}
+            <AppInput label="Ghi chú chia tiền" value={billText} onChangeText={(value) => { setBillText(value); setBillError(''); }} placeholder="Tổng 850k / 5 người = 170k/người, chuyển cho host" multiline maxLength={200} />
+            {billError ? <Text accessibilityRole="alert" style={styles.error}>{billError}</Text> : null}
+            <AppButton label="Gửi chốt bill" icon="money" onPress={submitBill} />
           </View>
         </KeyboardAvoidingView>
       </BottomSheet>
@@ -332,6 +391,9 @@ const styles = StyleSheet.create({
   sendDisabled: { backgroundColor: AppColors.disabled },
   sheetForm: { gap: 14 },
   error: { ...TypeScale.caption, color: AppColors.danger },
+  templateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  templateChip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: Radius.pill, backgroundColor: AppColors.section, borderWidth: 1, borderColor: AppColors.border },
+  templateText: { ...TypeScale.caption, color: AppColors.accentText },
   sheetOptions: { gap: 9 },
   sheetOption: { minHeight: 66, borderRadius: Radius.md, borderWidth: 1, borderColor: AppColors.border, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 11 },
   sheetOptionIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: AppColors.accentSoft, alignItems: 'center', justifyContent: 'center' },

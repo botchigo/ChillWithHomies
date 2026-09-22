@@ -4,7 +4,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View, type GestureRespond
 
 import { Badge } from '@/components/ui/app-primitives';
 import { useDemoApp } from '@/context/demo-app-context';
-import { formatDistance, type Meetup } from '@/data/demo-data';
+import { formatDistance, formatVND, unpaidShares, type Meetup } from '@/data/demo-data';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
 
 const cover = require('@/assets/images/meetup-rooftop.png');
@@ -78,6 +78,13 @@ export function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () =>
           <Text style={styles.title}>{meetup.title}</Text>
           <Badge label={meetup.category} tone="orange" />
         </View>
+        <View style={styles.subBadges}>
+          {meetup.alcoholType ? <Badge label={meetup.alcoholType} tone="amber" icon="beer" /> : null}
+          {meetup.age18Plus ? <Badge label="18+" tone="neutral" icon="id-card" /> : null}
+          {meetup.tableBooked ? <Badge label="Đã đặt bàn" tone="green" icon="check" /> : null}
+          {(meetup.depositAmount ?? 0) > 0 ? <Badge label={`Cọc ${formatVND(meetup.depositAmount!)}`} tone="green" icon="lock" /> : null}
+          {meetup.billTotal ? (unpaidShares(meetup).length ? <Badge label={`Còn ${unpaidShares(meetup).length} chưa trả`} tone="orange" icon="money" /> : <Badge label="Đã trả đủ" tone="green" icon="check" />) : null}
+        </View>
         <View style={styles.meta}><FontAwesome name="clock-o" size={14} color={AppColors.accent} /><Text style={styles.metaText}>{meetup.time} · {meetup.dateLabel}</Text></View>
         <View style={styles.meta}><FontAwesome name="map-marker" size={15} color={AppColors.accent} /><Text numberOfLines={1} style={styles.metaText}>{meetup.location}, {meetup.district}</Text></View>
         <View style={styles.footer}>
@@ -107,7 +114,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.92, transform: [{ scale: 0.995 }] },
   imageWrap: { height: 154, backgroundColor: AppColors.section }, image: { width: '100%', height: '100%' }, imageTint: { ...StyleSheet.absoluteFill, opacity: 0.08 }, imageShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(47,36,28,0.12)' },
   topBadges: { position: 'absolute', left: 12, right: 12, top: 12, flexDirection: 'row', justifyContent: 'space-between' },
-  body: { padding: 16 }, titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 }, title: { ...TypeScale.h3, fontFamily: FontFamily.headingBold, color: AppColors.text, flex: 1 },
+  body: { padding: 16 }, titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 }, title: { ...TypeScale.h3, fontFamily: FontFamily.headingBold, color: AppColors.text, flex: 1 }, subBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }, metaText: { ...TypeScale.caption, color: AppColors.textSecondary, flex: 1 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 15, paddingTop: 14, borderTopWidth: 1, borderTopColor: AppColors.border }, host: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }, hostCopy: { flex: 1, minWidth: 0 }, avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, avatarText: { color: AppColors.surface, fontFamily: FontFamily.headingBold, fontSize: 15 }, hostName: { flexDirection: 'row', alignItems: 'center', gap: 5 }, hostText: { ...TypeScale.label, color: AppColors.text, flexShrink: 1 }, people: { fontFamily: FontFamily.body, fontSize: 10, lineHeight: 14, color: AppColors.textSecondary },
   joinButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: AppColors.accent, borderWidth: 1, borderColor: AppColors.accent },
