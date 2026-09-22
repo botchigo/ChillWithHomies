@@ -1,355 +1,179 @@
-import React, { useState } from 'react';
+import { FontAwesome } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  TextInput,
-  TouchableOpacity,
-  Pressable,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FontAwesome } from '@expo/vector-icons';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useRouter } from 'expo-router';
+
+import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
+import { useDemoApp } from '@/context/demo-app-context';
+
+type FieldErrors = { phone?: string; password?: string; form?: string };
 
 export default function SignInScreen() {
   const router = useRouter();
-  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const { hydrated, state, signIn, notify } = useDemoApp();
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [focused, setFocused] = useState<'phone' | 'password' | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [notice, setNotice] = useState('');
 
-  async function onSignIn() {
-    if (!emailOrPhone.trim() || !password.trim() || isLoading) {
+  useEffect(() => {
+    if (hydrated && state.currentUser) router.replace('/(tabs)');
+  }, [hydrated, router, state.currentUser]);
+
+  function validate() {
+    const next: FieldErrors = {};
+    const digits = phone.replace(/\s/g, '');
+    if (!phone.trim()) next.phone = 'Vui lòng nhập số điện thoại.';
+    else if (!/^[0-9]{9,11}$/.test(digits)) next.phone = 'Số điện thoại cần có 9–11 chữ số.';
+    if (!password) next.password = 'Vui lòng nhập mật khẩu.';
+    else if (password.trim().length < 6) next.password = 'Mật khẩu cần ít nhất 6 ký tự.';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  function onSignIn() {
+    if (isLoading || !validate()) return;
+    setIsLoading(true);
+    const result = signIn(phone, password);
+    if (!result.ok) {
+      setErrors({ form: result.error ?? 'Không thể đăng nhập. Vui lòng thử lại.' });
+      setIsLoading(false);
       return;
     }
-
-    setNotice('');
-    setIsLoading(true);
-
-    // Preview navigation only; no credentials are authenticated or stored.
-    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-    setPassword('');
-    setIsLoading(false);
+    notify('Đăng nhập thành công. Chào bạn quay lại!');
     router.replace('/(tabs)');
   }
 
-  const isFormValid = Boolean(emailOrPhone.trim() && password.trim()) && !isLoading;
+  if (!hydrated || state.currentUser) {
+    return <View style={styles.loading}><ActivityIndicator color={AppColors.accent} /></View>;
+  }
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ flex: 1 }}
-        >
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <ThemedText type="title" style={[styles.title, styles.titleBrand]}>
-              ChillWithHomies
-            </ThemedText>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={styles.brandMark}><FontAwesome name="users" size={24} color={AppColors.surface} /></View>
+          <Text style={styles.brand}>ChillWithHomies</Text>
+          <Text style={styles.heading}>Chào mừng bạn quay lại</Text>
+          <Text style={styles.subtitle}>Đăng nhập để tìm một kèo vui gần bạn tối nay.</Text>
 
-            <View style={styles.form}>
-              <ThemedText style={styles.demoNotice}>
-                Demo only: use sample details to explore. Sign-in, registration and password reset are simulated.
-              </ThemedText>
+          <View style={styles.formCard}>
+            <Text style={styles.label}>Số điện thoại</Text>
+            <View style={[styles.inputShell, focused === 'phone' && styles.inputFocused, errors.phone && styles.inputError]}>
+              <FontAwesome name="phone" size={16} color={focused === 'phone' ? AppColors.accent : AppColors.textSecondary} />
               <TextInput
-                style={styles.input}
-                placeholder='Số điện thoại'
-                placeholderTextColor='#9aa0a6'
-                value={emailOrPhone}
-                onChangeText={setEmailOrPhone}
-                keyboardType='phone-pad'
-                autoCapitalize='none'
+                accessibilityLabel="Số điện thoại"
+                autoComplete="tel"
                 editable={!isLoading}
+                keyboardType="phone-pad"
+                onBlur={() => setFocused(null)}
+                onChangeText={(value) => { setPhone(value); setErrors((current) => ({ ...current, phone: undefined, form: undefined })); }}
+                onFocus={() => setFocused('phone')}
+                placeholder="0901 234 567"
+                placeholderTextColor="#AA998A"
+                returnKeyType="next"
+                style={styles.input}
+                value={phone}
               />
+            </View>
+            {errors.phone ? <Text accessibilityRole="alert" style={styles.errorText}>{errors.phone}</Text> : null}
 
-              <View style={{ height: 12 }} />
-
-              <View style={styles.passwordContainer}>
-                <View style={styles.passwordInputWrapper} pointerEvents="box-none">
-                  <TextInput
-                    style={styles.passwordInput}
-                    placeholder='Password'
-                    placeholderTextColor='#9aa0a6'
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    editable={!isLoading}
-                  />
-                  <TouchableOpacity 
-                    onPress={() => setShowPassword(!showPassword)} 
-                    style={styles.showHideBtn}
-                    disabled={isLoading}
-                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    <FontAwesome 
-                      name={showPassword ? 'eye' : 'eye-slash'} 
-                      size={18} 
-                      color='#6b7280' 
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <TouchableOpacity 
-                activeOpacity={0.9} 
-                style={[styles.signInButton, !isFormValid && styles.signInButtonDisabled]} 
-                onPress={onSignIn}
-                disabled={!isFormValid}
-              >
-                {isLoading ? (
-                  <ActivityIndicator size='small' color='#fff' />
-                ) : (
-                  <ThemedText style={styles.signInText}>SIGN IN (DEMO)</ThemedText>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.signupRow}>
-                <ThemedText style={styles.noAccount}>Don&apos;t have an account?</ThemedText>
-                <Pressable onPress={() => router.push('/signup-info')} disabled={isLoading}>
-                  <ThemedText style={styles.signUp}> Sign Up</ThemedText>
-                </Pressable>
-              </View>
-
-              <View style={styles.dividerWrap}>
-                <View style={styles.divider} />
-                <ThemedText style={styles.orText}>Or sign in with:</ThemedText>
-                <View style={styles.divider} />
-              </View>
-
-              <View style={styles.socialRow}>
-                <TouchableOpacity 
-                  style={styles.socialButton} 
-                  onPress={() => setNotice('Facebook sign-in is not available in this demo.')}
-                  disabled={isLoading}
-                  accessibilityLabel="Sign in with Facebook"
-                >
-                  <FontAwesome name='facebook' size={20} color='#3b5998' />
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.socialButton} 
-                  onPress={() => setNotice('Google sign-in is not available in this demo.')}
-                  disabled={isLoading}
-                  accessibilityLabel="Sign in with Google"
-                >
-                  <FontAwesome name='google' size={20} color='#DB4437' />
-                </TouchableOpacity>
-              </View>
-
-              {notice ? (
-                <ThemedText style={styles.demoNotice} accessibilityRole="alert">
-                  {notice}
-                </ThemedText>
-              ) : null}
-
-              <Pressable 
-                onPress={() => router.push('/forgot')} 
-                style={styles.forgotPasswordRow}
-                disabled={isLoading}
-              >
-                <ThemedText style={styles.forgotPasswordText}>Forgot password?</ThemedText>
-              </Pressable>
-
+            <Text style={[styles.label, styles.passwordLabel]}>Mật khẩu</Text>
+            <View style={[styles.inputShell, focused === 'password' && styles.inputFocused, errors.password && styles.inputError]}>
+              <FontAwesome name="lock" size={16} color={focused === 'password' ? AppColors.accent : AppColors.textSecondary} />
+              <TextInput
+                accessibilityLabel="Mật khẩu"
+                autoCapitalize="none"
+                autoComplete="password"
+                autoCorrect={false}
+                editable={!isLoading}
+                onBlur={() => setFocused(null)}
+                onChangeText={(value) => { setPassword(value); setErrors((current) => ({ ...current, password: undefined, form: undefined })); }}
+                onFocus={() => setFocused('password')}
+                onSubmitEditing={onSignIn}
+                placeholder="Ít nhất 6 ký tự"
+                placeholderTextColor="#AA998A"
+                returnKeyType="go"
+                secureTextEntry={!showPassword}
+                style={styles.input}
+                value={password}
+              />
               <Pressable
+                accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 accessibilityRole="button"
-                accessibilityLabel="Open the Amber design system"
-                onPress={() => router.push('/design-system')}
-                style={({ pressed }) => [styles.designSystemLink, pressed && { opacity: 0.7 }]}
-              >
-                <FontAwesome name="sun-o" size={16} color="#A6530C" />
-                <ThemedText style={styles.designSystemText}>Explore Amber design system</ThemedText>
-                <FontAwesome name="arrow-right" size={13} color="#A6530C" />
+                hitSlop={10}
+                onPress={() => setShowPassword((value) => !value)}
+                style={({ pressed }) => [styles.eyeButton, pressed && styles.pressed]}>
+                <FontAwesome name={showPassword ? 'eye' : 'eye-slash'} size={18} color={AppColors.textSecondary} />
               </Pressable>
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </ThemedView>
+            {errors.password ? <Text accessibilityRole="alert" style={styles.errorText}>{errors.password}</Text> : null}
+            {errors.form ? <Text accessibilityRole="alert" style={styles.formError}>{errors.form}</Text> : null}
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={isLoading}
+              onPress={onSignIn}
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, isLoading && styles.disabled]}>
+              {isLoading ? <ActivityIndicator color={AppColors.surface} /> : <><Text style={styles.primaryButtonText}>Đăng nhập</Text><FontAwesome name="arrow-right" size={15} color={AppColors.surface} /></>}
+            </Pressable>
+
+            <Pressable accessibilityRole="button" onPress={() => router.push('/forgot-password')} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
+              <Text style={styles.textButtonLabel}>Quên mật khẩu?</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.signupRow}>
+            <Text style={styles.muted}>Chưa có tài khoản?</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/signup')}><Text style={styles.signupLink}> Tạo tài khoản demo</Text></Pressable>
+          </View>
+          <Text style={styles.demoNote}>Bản demo chấp nhận mọi số điện thoại và mật khẩu đúng định dạng.</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 36,
-    alignItems: 'center',
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  title: {
-    marginTop: 6,
-    marginBottom: 28,
-    textAlign: 'center',
-  },
-  titleBrand: {
-    color: '#ffb233',
-  },
-  form: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  demoNotice: {
-    color: '#6b7280',
-    fontSize: 13,
-    textAlign: 'center',
-    marginVertical: 12,
-  },
-  label: {
-    fontSize: 13,
-    color: '#8b8f93',
-    marginBottom: 6,
-  },
-  input: {
-    width: '100%',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 30,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e6e6e6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  passwordContainer: {
-    width: '100%',
-  },
-  passwordInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 30,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e6e6e6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-    paddingRight: 60,
-  },
-  showHideBtn: {
-    position: 'absolute',
-    right: 16,
-    padding: 8,
-  },
-  signInButton: {
-    marginTop: 22,
-    width: '100%',
-    borderRadius: 30,
-    paddingVertical: 14,
-    backgroundColor: '#ffb233',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#ffb233',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  signInButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    shadowColor: '#d1d5db',
-  },
-  signInText: {
-    color: '#fff',
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  signupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  noAccount: {
-    color: '#6b7280',
-  },
-  signUp: {
-    color: '#ffb233',
-    fontWeight: '600',
-  },
-  dividerWrap: {
-    width: '100%',
-    marginTop: 26,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ececec',
-    marginHorizontal: 8,
-  },
-  orText: {
-    color: '#9aa0a6',
-    fontSize: 13,
-  },
-  socialRow: {
-    marginTop: 16,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  socialButton: {
-    width: 140,
-    height: 48,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#e6e6e6',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  forgotPasswordRow: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  forgotPasswordText: {
-    color: '#6b7280',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  designSystemLink: {
-    minHeight: 48,
-    marginTop: 24,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    backgroundColor: '#FFF2BF',
-    borderWidth: 1,
-    borderColor: '#F1DFC7',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  designSystemText: {
-    color: '#2F241C',
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  flex: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: AppColors.background },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: AppColors.background },
+  content: { flexGrow: 1, paddingHorizontal: 22, paddingTop: 34, paddingBottom: 32, alignItems: 'center', justifyContent: 'center' },
+  brandMark: { width: 58, height: 58, borderRadius: 20, backgroundColor: AppColors.accent, alignItems: 'center', justifyContent: 'center', ...WarmShadow },
+  brand: { marginTop: 14, fontFamily: FontFamily.headingBold, fontSize: 16, color: AppColors.accent, letterSpacing: 0.3 },
+  heading: { ...TypeScale.h1, color: AppColors.text, textAlign: 'center', marginTop: 22 },
+  subtitle: { ...TypeScale.body, color: AppColors.textSecondary, textAlign: 'center', maxWidth: 330, marginTop: 7, marginBottom: 24 },
+  formCard: { width: '100%', maxWidth: 440, padding: 20, borderRadius: Radius.lg, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, ...WarmShadow },
+  label: { ...TypeScale.label, color: AppColors.text, marginBottom: 7 },
+  passwordLabel: { marginTop: 16 },
+  inputShell: { minHeight: 54, paddingHorizontal: 15, borderWidth: 1, borderColor: AppColors.border, borderRadius: Radius.md, backgroundColor: AppColors.background, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  inputFocused: { borderColor: AppColors.accent, backgroundColor: AppColors.surface },
+  inputError: { borderColor: AppColors.danger },
+  input: { ...TypeScale.body, color: AppColors.text, flex: 1, paddingVertical: 12, minWidth: 0 },
+  eyeButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
+  errorText: { ...TypeScale.caption, color: AppColors.dangerText, marginTop: 5 },
+  formError: { ...TypeScale.caption, color: AppColors.dangerText, backgroundColor: AppColors.dangerSoft, borderRadius: Radius.sm, padding: 10, marginTop: 14 },
+  primaryButton: { minHeight: 54, marginTop: 22, borderRadius: Radius.md, backgroundColor: AppColors.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  primaryButtonText: { ...TypeScale.label, color: AppColors.surface, fontSize: 15 },
+  textButton: { alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, marginTop: 8 },
+  textButtonLabel: { ...TypeScale.label, color: AppColors.accentText },
+  signupRow: { flexDirection: 'row', alignItems: 'center', marginTop: 22 },
+  muted: { ...TypeScale.body, color: AppColors.textSecondary },
+  signupLink: { ...TypeScale.label, color: AppColors.accent },
+  demoNote: { ...TypeScale.caption, color: AppColors.textSecondary, textAlign: 'center', maxWidth: 320, marginTop: 12 },
+  pressed: { opacity: 0.76, transform: [{ scale: 0.99 }] },
+  disabled: { opacity: 0.55 },
 });

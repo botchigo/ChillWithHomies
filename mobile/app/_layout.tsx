@@ -8,7 +8,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+import { Toast } from '@/components/ui/amber-kit';
 import { AppColors } from '@/constants/theme';
+import { DemoAppProvider, useDemoApp } from '@/context/demo-app-context';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -22,10 +24,17 @@ export default function RootLayout() {
   useEffect(() => { if (loaded) void SplashScreen.hideAsync(); }, [loaded]);
   if (!loaded) return null;
 
+  return <DemoAppProvider><AppNavigator /></DemoAppProvider>;
+}
+
+function AppNavigator() {
+  const { toast, dismissToast } = useDemoApp();
   return (
     <ThemeProvider value={{ ...DefaultTheme, colors: { ...DefaultTheme.colors, background: AppColors.background, primary: AppColors.accent, card: AppColors.surface, text: AppColors.text, border: AppColors.border } }}>
       <Stack>
         <Stack.Screen name="signin" options={{ headerShown: false }} />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
+        <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
         <Stack.Screen name="design-system" options={{ headerShown: false }} />
         <Stack.Screen name="signup-info" options={{ headerShown: false }} />
         <Stack.Screen name="signup-otp" options={{ headerShown: false }} />
@@ -39,9 +48,14 @@ export default function RootLayout() {
         <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="meetup/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="chat/[meetupId]" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="friends" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="dark" />
+      <Toast message={toast} onClose={dismissToast} />
     </ThemeProvider>
   );
 }

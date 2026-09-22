@@ -40,6 +40,12 @@
       ],
       "expo-font",
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ChillWithHomies cần quyền truy cập ảnh để bạn chọn ảnh đại diện."
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser"
     ],
