@@ -52,9 +52,23 @@ Dependencies should flow from routes/components to feature hooks, then pure feat
 
 Each phase must keep navigation, AsyncStorage keys, hydration timing, and user-visible behavior stable, and must pass typecheck, lint, and production export before cleanup.
 
+## Migration progress (2026-09-23)
+
+- Canonical UI is `src/shared/components/ui/` (`app-primitives`, `toast`). `components/ui/app-primitives` and
+  `components/meetup-card` are compatibility re-exports. `_layout` uses the shared `Toast`.
+- `MeetupCard` canonical location is `src/features/sessions/components/meetup-card.tsx`.
+- Provider delegates ID generation to `src/shared/utils/ids`, meetup building to
+  `src/features/sessions/services/meetup-factory`, and chat message building to
+  `src/features/chat/services/chat-factory`. Storage key and hydration behavior unchanged.
+- Replaced the orphan KYC screens (`signup-otp`, `signup-kyc-guide`, `signup-id-card`, `signup-nfc-guide`,
+  `signup-liveness`, `signup-review`) with redirect shims to the current onboarding flow, preserving legacy deep links.
+  Removed unused template components (`hello-wave`, `parallax-scroll-view`, `external-link`, `collapsible`).
+  `forgot` and `signup-info` also remain as redirect shims.
+- Pure logic covered by vitest (`npm test`): `session-rules`, `auth-validation`, `trust-score`, factories.
+
 ## Risks
 
 - Changing the persisted state schema can strand existing local data.
 - Moving route files would change Expo Router paths, so route files stay in place.
 - Splitting the provider too aggressively can alter action ordering or stale-closure behavior.
-- Legacy KYC screens may still be used through direct links and are not removed without a product decision.
+- Legacy KYC screen implementations were removed; their routes remain as redirect shims to `/signup`.

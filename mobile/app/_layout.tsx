@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { Toast } from '@/components/ui/amber-kit';
+import { Toast } from '@/src/shared/components/ui/toast';
 import { AppColors } from '@/constants/theme';
 import { DemoAppProvider, useDemoApp } from '@/context/demo-app-context';
 

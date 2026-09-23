@@ -2,12 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 
 import { createSeedState } from '@/data/demo-data';
+import { buildMeetupFromDraft, buildMeetupId } from '@/src/features/sessions/services/meetup-factory';
+import { buildEtaMessage, buildLocationMessage, buildPollMessage, buildSystemMessage, buildTextMessage } from '@/src/features/chat/services/chat-factory';
+import { createId } from '@/src/shared/utils/ids';
 import { loadDemoState, saveDemoState } from '@/src/shared/persistence/demo-state-storage';
 import { normalizePhone, normalizeUsername, validateCompleteSignUp, validateSignInCredentials } from '@/src/features/auth/services/auth-validation';
 import type { CompleteSignUpInput } from '@/src/features/auth/types';
 import type { ChatMessage } from '@/src/features/chat/types';
 import type { UserProfile } from '@/src/features/profile/types';
-import { meetupDateLabel, splitBillEqually } from '@/src/features/sessions/services/session-rules';
+import { splitBillEqually } from '@/src/features/sessions/services/session-rules';
 import type { MeetupDraft } from '@/src/features/sessions/types';
 import { applyCompletedMeetupReward, applyNoShowPenalty } from '@/src/features/trust/services/trust-score';
 import type { DemoAppState } from '@/src/shared/types/demo-app-state';
@@ -57,7 +60,6 @@ type DemoAppContextValue = {
 
 const DemoAppContext = createContext<DemoAppContextValue | null>(null);
 
-const id = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 export function DemoAppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DemoAppState>(() => createSeedState());
   const [hydrated, setHydrated] = useState(false);
@@ -206,7 +208,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
           ? { ...item, friendIds: item.friendIds.includes(userId) ? item.friendIds : [...item.friendIds, userId] }
           : item),
       notifications: user && current.notificationsEnabled ? [{
-        id: id('notification'), type: 'friend_accepted', title: `Bạn và ${user.name} đã trở thành bạn bè`,
+        id: createId('notification'), type: 'friend_accepted', title: `Bạn và ${user.name} đã trở thành bạn bè`,
         description: 'Hai bạn có thể tiếp tục gặp nhau trong các meetup chung.', createdAt: new Date().toISOString(), read: false, userId,
       }, ...current.notifications] : current.notifications,
     }) : current);
@@ -297,13 +299,13 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
       });
       const hasRoom = current.chats.some((room) => room.meetupId === meetupId);
       const chats = hasRoom ? current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `${user.name} đã khóa cọc ${deposit > 0 ? `${deposit.toLocaleString('vi-VN')}đ` : '0đ'} và tham gia kèo.`, createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildSystemMessage(`${user.name} đã khóa cọc ${deposit > 0 ? `${deposit.toLocaleString('vi-VN')}đ` : '0đ'} và tham gia kèo.`)],
       } : room) : [...current.chats, {
         meetupId, unread: 0, onlineCount: 1,
-        messages: [{ id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `${user.name} đã tham gia nhóm.`, createdAt: new Date().toISOString() }],
+        messages: [buildSystemMessage(`${user.name} đã tham gia nhóm.`)],
       }];
       const notifications = current.notificationsEnabled ? [{
-        id: id('notification'), type: 'meetup' as const, title: `Bạn đã được thêm vào kèo ${meetup.title}`,
+        id: createId('notification'), type: 'meetup' as const, title: `Bạn đã được thêm vào kèo ${meetup.title}`,
         description: `${meetup.dateLabel}, ${meetup.time} tại ${meetup.location}. Cọc ${deposit.toLocaleString('vi-VN')}đ (demo).`, createdAt: new Date().toISOString(), read: false, meetupId,
       }, ...current.notifications] : current.notifications;
       return { ...current, meetups, chats, notifications };
@@ -327,7 +329,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         checkedInIds: (item.checkedInIds ?? []).filter((v) => v !== current.currentUser?.id),
       } : item),
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `${current.currentUser?.name} đã rời kèo.${deposit > 0 ? ` Cọc ${deposit.toLocaleString('vi-VN')}đ được chia cho người ở lại (demo).` : ''}`, createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildSystemMessage(`${current.currentUser?.name} đã rời kèo.${deposit > 0 ? ` Cọc ${deposit.toLocaleString('vi-VN')}đ được chia cho người ở lại (demo).` : ''}`)],
       } : room),
       users: current.users.map((user) => user.id === current.currentUser?.id ? { ...user, ...applyNoShowPenalty(user) } : user),
     }));
@@ -348,7 +350,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         checkedInIds: (item.checkedInIds ?? []).filter((v) => v !== current.currentUser?.id),
       } : item),
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: 'Một thành viên đã rời kèo vì lý do cá nhân. Cả nhóm tiếp tục vui vẻ nhé.', createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildSystemMessage('Một thành viên đã rời kèo vì lý do cá nhân. Cả nhóm tiếp tục vui vẻ nhé.')],
       } : room),
     }));
     notify('Đã rời khẩn an toàn. Vị trí quán đã được gửi cho người thân (demo).');
@@ -358,36 +360,15 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
   const createMeetup = useCallback((draft: MeetupDraft) => {
     if (!state.currentUser) return null;
     if (!draft.ageConfirm) return null;
-    const size = Math.min(12, Math.max(2, draft.maxParticipants));
-    const depositAmount = draft.depositAmount ?? 0;
-    const meetupId = `${draft.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 32) || 'meetup'}-${Date.now().toString(36)}`;
     const user = state.currentUser;
-    const menuItems = draft.menuNote?.trim()
-      ? draft.menuNote.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 8).map((line) => {
-        const match = line.match(/^(.+?)\s+(\d+)\s*k?$/i);
-        return match ? { name: match[1].trim(), price: Number(match[2]) * 1000 } : { name: line.slice(0, 40), price: 0 };
-      })
-      : [];
-    const image = draft.category.includes('Bia') || draft.category.includes('Nhậu') || draft.category.includes('Rooftop') ? 'rooftop' as const
-      : draft.category.includes('ốc') || draft.category.includes('Lẩu') || draft.category.includes('Ăn') ? 'dinner' as const
-      : draft.category.includes('Café') ? 'coffee' as const
-      : draft.category.includes('Board') ? 'games' as const
-      : draft.category.includes('Karaoke') ? 'karaoke' as const : 'rooftop' as const;
+    const meetupId = buildMeetupId(draft.title);
+    const meetup = buildMeetupFromDraft(draft, user, meetupId);
     setState((current) => ({
       ...current,
-      meetups: [{
-        id: meetupId, title: draft.title.trim(), category: draft.category, date: draft.date, dateLabel: meetupDateLabel(draft.date), time: draft.time,
-        location: draft.location.trim(), district: draft.district?.trim() || 'TP. Hồ Chí Minh', distanceKm: 0, hostId: user.id, hostName: user.name,
-        hostAvatar: user.id === 'user-minh-anh' ? 'profile-minh-anh' : user.username, hostAvatarColor: user.avatarColor, hostAvatarUri: user.avatarUri, hostVerified: !!user.verified,
-        participants: [user], maxParticipants: size, vibe: draft.vibe, paymentType: draft.paymentType,
-        description: draft.description.trim() || 'Host sẽ cập nhật thêm thông tin trước khi kèo nhậu bắt đầu.', status: 'upcoming', isPublic: draft.isPublic, image, color: '#F28C28',
-        alcoholType: draft.alcoholType || 'Bia hơi', menuItems, billNote: draft.billNote?.trim() || undefined,
-        drinkLimit: draft.drinkLimit || 'Tự lượng sức', age18Plus: true, mapQuery: `${draft.location.trim()} ${draft.district?.trim() || ''}`.trim(), tableBooked: false,
-        depositAmount, billShares: [], checkedInIds: [user.id],
-      }, ...current.meetups],
+      meetups: [meetup, ...current.meetups],
       chats: [{
         meetupId, unread: 0, onlineCount: 1,
-        messages: [{ id: id('msg'), type: 'system', senderId: 'system', senderName: 'ChillWithHomies', text: `${user.name} đã tạo kèo nhậu. Nhớ 18+ và đã uống thì không lái xe nhé!`, createdAt: new Date().toISOString() }],
+        messages: [buildSystemMessage(`${user.name} đã tạo kèo nhậu. Nhớ 18+ và đã uống thì không lái xe nhé!`)],
       }, ...current.chats],
     }));
     notify('Tạo kèo nhậu thành công 🎉');
@@ -407,23 +388,14 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = useCallback((meetupId: string, text: string) => {
     if (!text.trim()) return { ok: false, error: 'Tin nhắn không được để trống.' };
-    return appendMessage(meetupId, (user) => ({
-      id: id('msg'), type: 'text', senderId: user.id, senderName: user.name, text: text.trim(), createdAt: new Date().toISOString(),
-    }));
+    return appendMessage(meetupId, (user) => buildTextMessage(user, text));
   }, [appendMessage]);
-  const sendLocation = useCallback((meetupId: string, location: { name: string; address: string }) => appendMessage(meetupId, (user) => ({
-    id: id('msg'), type: 'location', senderId: user.id, senderName: user.name, text: `Đã gửi vị trí: ${location.name}`, location, createdAt: new Date().toISOString(),
-  })), [appendMessage]);
-  const sendEta = useCallback((meetupId: string, minutes: number) => appendMessage(meetupId, (user) => ({
-    id: id('msg'), type: 'eta', senderId: user.id, senderName: user.name, text: `${user.name} sẽ tới sau khoảng ${minutes} phút.`, createdAt: new Date().toISOString(),
-  })), [appendMessage]);
+  const sendLocation = useCallback((meetupId: string, location: { name: string; address: string }) => appendMessage(meetupId, (user) => buildLocationMessage(user, location)), [appendMessage]);
+  const sendEta = useCallback((meetupId: string, minutes: number) => appendMessage(meetupId, (user) => buildEtaMessage(user, minutes)), [appendMessage]);
   const createPoll = useCallback((meetupId: string, question: string, options: string[]) => {
     const validOptions = options.map((option) => option.trim()).filter(Boolean);
     if (!question.trim() || validOptions.length < 2) return { ok: false, error: 'Bình chọn cần câu hỏi và ít nhất 2 lựa chọn.' };
-    return appendMessage(meetupId, (user) => ({
-      id: id('msg'), type: 'poll', senderId: user.id, senderName: user.name, text: question.trim(), createdAt: new Date().toISOString(),
-      poll: { question: question.trim(), options: validOptions.map((label) => ({ id: id('option'), label, voterIds: [] })) },
-    }));
+    return appendMessage(meetupId, (user) => buildPollMessage(user, question, validOptions)!);
   }, [appendMessage]);
 
   const votePoll = useCallback((meetupId: string, messageId: string, optionId: string) => {
@@ -453,9 +425,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
 
   const sendBillNote = useCallback((meetupId: string, text: string) => {
     if (!text.trim()) return { ok: false, error: 'Nội dung chốt bill không được để trống.' };
-    return appendMessage(meetupId, (user) => ({
-      id: id('msg'), type: 'text', senderId: user.id, senderName: user.name, text: `🧾 Chốt bill: ${text.trim()}`, createdAt: new Date().toISOString(),
-    }));
+    return appendMessage(meetupId, (user) => buildTextMessage(user, `🧾 Chốt bill: ${text.trim()}`));
   }, [appendMessage]);
 
   const checkIn = useCallback((meetupId: string): ActionResult => {
@@ -469,7 +439,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
       ...current,
       meetups: current.meetups.map((m) => m.id === meetupId ? { ...m, checkedInIds: [...(m.checkedInIds ?? []), user.id] } : m),
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `${user.name} đã check-in tại quán.`, createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildSystemMessage(`${user.name} đã check-in tại quán.`)],
       } : room),
     }));
     notify('Check-in thành công. Bạn đã có mặt tại quán!');
@@ -495,7 +465,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         }),
       } : m),
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'text' as const, senderId: currentUser.id, senderName: currentUser.name, text: `🧾 Host đã chốt bill ${rounded.toLocaleString('vi-VN')}đ — mỗi người ~${Math.round(rounded / Math.max(1, meetup.participants.length)).toLocaleString('vi-VN')}đ (đã trừ cọc demo khi xác nhận).`, createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildTextMessage(currentUser, `🧾 Host đã chốt bill ${rounded.toLocaleString('vi-VN')}đ — mỗi người ~${Math.round(rounded / Math.max(1, meetup.participants.length)).toLocaleString('vi-VN')}đ (đã trừ cọc demo khi xác nhận).`)],
       } : room),
     }));
     notify(`Đã chốt bill ${rounded.toLocaleString('vi-VN')}đ, chia đều cho cả bàn.`);
@@ -507,11 +477,10 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     const currentUser = state.currentUser;
     const meetup = state.meetups.find((m) => m.id === meetupId);
     if (!meetup?.billTotal) return { ok: false, error: 'Host chưa chốt bill.' };
-    const me = state.currentUser.id;
     setState((current) => ({
       ...current,
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'text' as const, senderId: me, senderName: currentUser.name, text: '✅ Tôi đã chuyển tiền bill, host xác nhận giúp nhé!', createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildTextMessage(currentUser, '✅ Tôi đã chuyển tiền bill, host xác nhận giúp nhé!')],
       } : room),
     }));
     notify('Đã báo đã trả. Chờ host xác nhận.');
@@ -529,7 +498,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         ...m, billShares: (m.billShares ?? []).map((s) => s.userId === userId ? { ...s, paid: true } : s),
       } : m),
       chats: current.chats.map((room) => room.meetupId === meetupId ? {
-        ...room, messages: [...room.messages, { id: id('msg'), type: 'system' as const, senderId: 'system', senderName: 'ChillWithHomies', text: `Host đã xác nhận thanh toán của thành viên.`, createdAt: new Date().toISOString() }],
+        ...room, messages: [...room.messages, buildSystemMessage(`Host đã xác nhận thanh toán của thành viên.`)],
       } : room),
       users: current.users.map((user) => user.id === userId ? { ...user, ...applyCompletedMeetupReward(user) } : user),
     }));
@@ -544,9 +513,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
     const text = kind === 'grab'
       ? `🚕 ${state.currentUser.name} cần về chung — ai tiện đường ghép Grab nhé! Đã uống không lái xe.`
       : `🆘 ${state.currentUser.name} cần hỗ trợ — vị trí: ${meetup.location}, ${meetup.district}. Người thân đã được báo (demo).`;
-    const res = appendMessage(meetupId, (user) => ({
-      id: id('msg'), type: 'text', senderId: user.id, senderName: user.name, text, createdAt: new Date().toISOString(),
-    }));
+    const res = appendMessage(meetupId, (user) => buildTextMessage(user, text));
     if (!res.ok) return res;
     notify(kind === 'grab' ? 'Demo: đã gửi yêu cầu Grab về chung cho cả bàn!' : 'Demo: đã gửi SOS + vị trí quán cho người thân!');
     return { ok: true };
@@ -568,7 +535,7 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         meetupId,
         unread: 0,
         onlineCount: 1,
-        messages: [{ id: id('msg'), type: 'system', senderId: 'system', senderName: 'ChillWithHomies', text: `Phòng chat của ${user.name} đã sẵn sàng.`, createdAt: new Date().toISOString() }],
+        messages: [buildSystemMessage(`Phòng chat của ${user.name} đã sẵn sàng.`)],
       }],
     });
     return { ok: true };

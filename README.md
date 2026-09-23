@@ -50,6 +50,7 @@ Chạy trong `mobile/`:
 ```powershell
 npm.cmd run typecheck
 npm.cmd run lint
+npm.cmd test
 npx.cmd expo export --platform web
 ```
 

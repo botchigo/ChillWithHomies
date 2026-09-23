@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MeetupCard } from '@/components/meetup-card';
-import { AppButton, BottomSheet, Chip } from '@/components/ui/app-primitives';
+import { MeetupCard } from '@/src/features/sessions/components/meetup-card';
+import { AppButton, BottomSheet, Chip } from '@/src/shared/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale } from '@/constants/theme';
 import { type MeetupFilter } from '@/src/features/sessions/constants';
 import { useMeetupDiscovery } from '@/src/features/sessions/hooks/use-meetup-discovery';
