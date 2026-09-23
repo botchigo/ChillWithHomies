@@ -1,0 +1,1336 @@
+openapi: 3.1.0
+info:
+  title: ChillWithHomies API
+  version: 0.1.0
+  description: Contracts for the Supabase Edge Function API. Money values are integer VND demo-ledger amounts.
+servers:
+  - url: http://127.0.0.1:54321/functions/v1/api
+    description: Local Supabase
+  - url: https://{projectRef}.supabase.co/functions/v1/api
+    description: Supabase Cloud
+    variables:
+      projectRef:
+        default: project-ref
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+    description: Phone OTP, signup completion, and legacy-state migration.
+  - name: Profile and social
+    description: Profile, friend request, friendship, and blocking operations.
+  - name: Sessions
+    description: Meetup discovery, participation, check-in, and demo bill ledger.
+  - name: Chat
+    description: Meetup room history, messages, read state, and polls.
+  - name: Safety
+    description: Grab and SOS signals scoped to meetup participants.
+  - name: Notifications
+    description: In-app notification state and Expo push token registration.
+paths:
+  /auth/otp/request:
+    post:
+      operationId: requestPhoneOtp
+      summary: Request a phone OTP
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '202':
+          description: OTP accepted for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/otp/verify:
+    post:
+      operationId: verifyPhoneOtp
+      summary: Verify a phone OTP and create a session
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/signup/complete:
+    post:
+      operationId: completeSignup
+      summary: Complete the five-step signup profile
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteSignUpInput'
+      responses:
+        '201':
+          description: Created profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /migration/import:
+    post:
+      operationId: importLegacyDemoState
+      summary: Import the local demo-state-v3 payload once
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MigrationImportRequest'
+      responses:
+        '200':
+          description: Mapping from legacy IDs to server IDs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MigrationImportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /me:
+    get:
+      operationId: getMe
+      summary: Get the authenticated profile
+      tags: [Profile and social]
+      responses:
+        '200':
+          description: Current profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateMe
+      summary: Update editable profile fields
+      tags: [Profile and social]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileInput'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /profiles/username-availability:
+    get:
+      operationId: checkUsernameAvailability
+      summary: Check whether a normalized username is available
+      tags: [Profile and social]
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_.]{3,20}$'
+      responses:
+        '200':
+          description: Username availability
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [available]
+                properties:
+                  available:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /profiles/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      operationId: getProfile
+      summary: Get a visible user profile
+      tags: [Profile and social]
+      responses:
+        '200':
+          description: Public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemoUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /social/friend-requests:
+    get:
+      operationId: listFriendRequests
+      summary: List sent and received friend requests
+      tags: [Profile and social]
+      responses:
+        '200':
+          description: Friend request state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRequestList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: sendFriendRequest
+      summary: Send a friend request
+      tags: [Profile and social]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserActionInput'
+      responses:
+        '201':
+          description: Friend request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /social/friend-requests/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      operationId: cancelFriendRequest
+      summary: Cancel a sent friend request
+      tags: [Profile and social]
+      responses:
+        '204':
+          description: Request cancelled
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /social/friend-requests/{userId}/accept:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      operationId: acceptFriendRequest
+      summary: Accept a received friend request
+      tags: [Profile and social]
+      responses:
+        '200':
+          description: Friendship created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /social/friend-requests/{userId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      operationId: rejectFriendRequest
+      summary: Reject a received friend request
+      tags: [Profile and social]
+      responses:
+        '204':
+          description: Request rejected
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /social/friends/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      operationId: unfriendUser
+      summary: Remove a friendship
+      tags: [Profile and social]
+      responses:
+        '204':
+          description: Friendship removed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /social/blocks:
+    post:
+      operationId: blockUser
+      summary: Block a user
+      tags: [Profile and social]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserActionInput'
+      responses:
+        '201':
+          description: User blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /social/blocks/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      operationId: unblockUser
+      summary: Unblock a user
+      tags: [Profile and social]
+      responses:
+        '204':
+          description: User unblocked
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /meetups:
+    get:
+      operationId: listMeetups
+      summary: Search and filter visible meetups
+      tags: [Sessions]
+      parameters:
+        - name: query
+          in: query
+          schema: { type: string }
+        - name: filter
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema:
+            $ref: '#/components/schemas/MeetupSort'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated meetups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetupPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createMeetup
+      summary: Create a meetup
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetupDraft'
+      responses:
+        '201':
+          description: Created meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /meetups/{meetupId}:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    get:
+      operationId: getMeetup
+      summary: Get meetup details
+      tags: [Sessions]
+      responses:
+        '200':
+          description: Meetup details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /meetups/{meetupId}/join:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: joinMeetup
+      summary: Join a meetup
+      tags: [Sessions]
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /meetups/{meetupId}/leave:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: leaveMeetup
+      summary: Leave a meetup
+      tags: [Sessions]
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /meetups/{meetupId}/emergency-leave:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: emergencyLeaveMeetup
+      summary: Leave a meetup through the safety flow
+      tags: [Sessions]
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /meetups/{meetupId}/check-in:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: checkInMeetup
+      summary: Check in to a meetup
+      tags: [Sessions]
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /meetups/{meetupId}/table:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    patch:
+      operationId: updateMeetupTable
+      summary: Update the table-booked state
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tableBooked]
+              properties:
+                tableBooked: { type: boolean }
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /meetups/{meetupId}/bill/total:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: setMeetupBillTotal
+      summary: Set and split the meetup bill
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [total]
+              properties:
+                total: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /meetups/{meetupId}/bill/my-payment:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: markMyMeetupPayment
+      summary: Mark the caller's demo bill payment as submitted
+      tags: [Sessions]
+      responses:
+        '200':
+          description: Payment submission recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /meetups/{meetupId}/bill/confirm:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: confirmMeetupPayment
+      summary: Confirm a participant's demo bill payment
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserActionInput'
+      responses:
+        '200':
+          description: Updated meetup
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meetup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /chat/rooms/{meetupId}:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: ensureChatRoom
+      summary: Ensure the meetup chat room exists
+      tags: [Chat]
+      responses:
+        '200':
+          description: Chat room
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRoom'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /chat/rooms/{meetupId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    get:
+      operationId: listChatMessages
+      summary: Get paginated chat history
+      tags: [Chat]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessagePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: sendChatMessage
+      summary: Send a chat message
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendChatMessageInput'
+      responses:
+        '201':
+          description: Authoritative message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /chat/rooms/{meetupId}/read:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: markChatRoomRead
+      summary: Mark a chat room as read
+      tags: [Chat]
+      responses:
+        '204':
+          description: Room marked read
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /chat/polls/{messageId}/vote:
+    parameters:
+      - $ref: '#/components/parameters/MessageId'
+    put:
+      operationId: voteChatPoll
+      summary: Idempotently select one poll option
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [optionId]
+              properties:
+                optionId: { type: string }
+      responses:
+        '200':
+          description: Updated poll message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /meetups/{meetupId}/safety-signals:
+    parameters:
+      - $ref: '#/components/parameters/MeetupId'
+    post:
+      operationId: sendSafetySignal
+      summary: Send a Grab or SOS safety signal
+      tags: [Safety]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SafetySignalInput'
+      responses:
+        '202':
+          description: Signal accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SafetySignal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /notifications:
+    get:
+      operationId: listNotifications
+      summary: List notifications for the authenticated user
+      tags: [Notifications]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /notifications/{notificationId}/read:
+    parameters:
+      - $ref: '#/components/parameters/NotificationId'
+    post:
+      operationId: markNotificationRead
+      summary: Mark one notification as read
+      tags: [Notifications]
+      responses:
+        '204':
+          description: Notification marked read
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      summary: Mark every notification as read
+      tags: [Notifications]
+      responses:
+        '204':
+          description: Notifications marked read
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /notifications/push-tokens:
+    post:
+      operationId: registerPushToken
+      summary: Register an Expo push token
+      tags: [Notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterPushTokenInput'
+      responses:
+        '201':
+          description: Token registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string }
+    MeetupId:
+      name: meetupId
+      in: path
+      required: true
+      schema: { type: string }
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      schema: { type: string }
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: { type: string }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    Unauthorized:
+      description: Missing or invalid session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    Forbidden:
+      description: Operation is not allowed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    NotFound:
+      description: Resource not found or hidden by access policy
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    Conflict:
+      description: Resource already exists or state conflicts
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until the request may be retried
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+  schemas:
+    ActionResult:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        error: { type: string }
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [ok, error]
+      properties:
+        ok: { const: false }
+        error: { type: string }
+        code: { type: string }
+    OtpRequest:
+      type: object
+      additionalProperties: false
+      required: [phone]
+      properties:
+        phone: { type: string, minLength: 9, maxLength: 16 }
+    OtpVerifyRequest:
+      type: object
+      additionalProperties: false
+      required: [phone, token]
+      properties:
+        phone: { type: string, minLength: 9, maxLength: 16 }
+        token: { type: string, pattern: '^\d{6}$' }
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [accessToken, refreshToken, expiresAt, userId, profileComplete]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresAt: { type: integer }
+        userId: { type: string }
+        profileComplete: { type: boolean }
+    CompleteSignUpInput:
+      type: object
+      additionalProperties: false
+      required: [phone, name, username, dateOfBirth, city, bio, avatarColor, interests, preferredVibes, notificationsEnabled]
+      properties:
+        phone: { type: string }
+        name: { type: string }
+        username: { type: string }
+        dateOfBirth: { type: string }
+        city: { type: string }
+        bio: { type: string }
+        avatarColor: { type: string }
+        avatarUri: { type: string }
+        interests:
+          type: array
+          items: { type: string }
+        preferredVibes:
+          type: array
+          items: { type: string }
+        notificationsEnabled: { type: boolean }
+    UserSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, username, avatarColor]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        avatarColor: { type: string }
+        avatarUri: { type: string }
+        verified: { type: boolean }
+    UserProfile:
+      type: object
+      additionalProperties: false
+      required: [id, name, username, avatarColor, phone, bio, city, interests, dateOfBirth, verifiedPhone, preferredVibes]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        avatarColor: { type: string }
+        avatarUri: { type: string }
+        verified: { type: boolean }
+        phone: { type: string }
+        bio: { type: string }
+        city: { type: string }
+        interests:
+          type: array
+          items: { type: string }
+        dateOfBirth: { type: string }
+        verifiedPhone: { type: boolean }
+        preferredVibes:
+          type: array
+          items: { type: string }
+    DemoUser:
+      type: object
+      additionalProperties: false
+      required: [id, name, username, avatarColor, bio, city, interests, friendIds]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        avatarColor: { type: string }
+        avatarUri: { type: string }
+        verified: { type: boolean }
+        reliabilityScore: { type: integer, minimum: 0, maximum: 100 }
+        completedKeos: { type: integer, minimum: 0 }
+        noShowCount: { type: integer, minimum: 0 }
+        bio: { type: string }
+        city: { type: string }
+        interests:
+          type: array
+          items: { type: string }
+        friendIds:
+          type: array
+          items: { type: string }
+    UpdateProfileInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string }
+        username: { type: string }
+        bio: { type: string }
+        city: { type: string }
+        avatarUri: { type: string }
+        interests:
+          type: array
+          items: { type: string }
+        preferredVibes:
+          type: array
+          items: { type: string }
+        notificationsEnabled: { type: boolean }
+    UserActionInput:
+      type: object
+      additionalProperties: false
+      required: [userId]
+      properties:
+        userId: { type: string }
+    FriendRequest:
+      type: object
+      additionalProperties: false
+      required: [id, fromUserId, toUserId, status, createdAt]
+      properties:
+        id: { type: string }
+        fromUserId: { type: string }
+        toUserId: { type: string }
+        status: { type: string, enum: [pending, accepted, rejected, cancelled] }
+        createdAt: { type: string, format: date-time }
+    FriendRequestList:
+      type: object
+      additionalProperties: false
+      required: [sent, received]
+      properties:
+        sent:
+          type: array
+          items: { $ref: '#/components/schemas/FriendRequest' }
+        received:
+          type: array
+          items: { $ref: '#/components/schemas/FriendRequest' }
+    MeetupSort:
+      type: string
+      enum: [Gần nhất, Sắp diễn ra, Còn nhiều chỗ]
+    MenuItem:
+      type: object
+      additionalProperties: false
+      required: [name, price]
+      properties:
+        name: { type: string }
+        price: { type: integer, minimum: 0 }
+    BillShare:
+      type: object
+      additionalProperties: false
+      required: [userId, amount, paid]
+      properties:
+        userId: { type: string }
+        amount: { type: integer, minimum: 0 }
+        paid: { type: boolean }
+        checkedIn: { type: boolean }
+    Meetup:
+      type: object
+      additionalProperties: false
+      required: [id, title, category, date, dateLabel, time, location, district, distanceKm, hostId, hostName, hostAvatar, hostAvatarColor, hostVerified, participants, maxParticipants, vibe, paymentType, description, status, isPublic, image, color]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        category: { type: string }
+        date: { type: string, format: date }
+        dateLabel: { type: string }
+        time: { type: string }
+        location: { type: string }
+        district: { type: string }
+        distanceKm: { type: number, minimum: 0 }
+        hostId: { type: string }
+        hostName: { type: string }
+        hostAvatar: { type: string }
+        hostAvatarColor: { type: string }
+        hostAvatarUri: { type: string }
+        hostVerified: { type: boolean }
+        participants:
+          type: array
+          items: { $ref: '#/components/schemas/UserSummary' }
+        maxParticipants: { type: integer, minimum: 2, maximum: 12 }
+        vibe:
+          type: array
+          items: { type: string }
+        paymentType: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [upcoming, ongoing, ended] }
+        isPublic: { type: boolean }
+        image: { type: string, enum: [rooftop, coffee, games, karaoke, dinner, running, workshop] }
+        color: { type: string }
+        alcoholType: { type: string }
+        menuItems:
+          type: array
+          items: { $ref: '#/components/schemas/MenuItem' }
+        billNote: { type: string }
+        drinkLimit: { type: string }
+        age18Plus: { type: boolean }
+        mapQuery: { type: string }
+        tableBooked: { type: boolean }
+        depositAmount: { type: integer, minimum: 0 }
+        billTotal: { type: integer, minimum: 0 }
+        billShares:
+          type: array
+          items: { $ref: '#/components/schemas/BillShare' }
+        checkedInIds:
+          type: array
+          items: { type: string }
+    MeetupDraft:
+      type: object
+      additionalProperties: false
+      required: [title, category, date, time, location, maxParticipants, paymentType, vibe, description, isPublic]
+      properties:
+        title: { type: string }
+        category: { type: string }
+        date: { type: string, format: date }
+        time: { type: string }
+        location: { type: string }
+        district: { type: string }
+        maxParticipants: { type: integer }
+        paymentType: { type: string }
+        vibe:
+          type: array
+          items: { type: string }
+        description: { type: string }
+        isPublic: { type: boolean }
+        alcoholType: { type: string }
+        menuNote: { type: string }
+        billNote: { type: string }
+        drinkLimit: { type: string }
+        ageConfirm: { type: boolean }
+        depositAmount: { type: integer, minimum: 0 }
+    MeetupPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Meetup' }
+        nextCursor: { type: string }
+    PollOption:
+      type: object
+      additionalProperties: false
+      required: [id, label, voterIds]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        voterIds:
+          type: array
+          items: { type: string }
+    Poll:
+      type: object
+      additionalProperties: false
+      required: [question, options]
+      properties:
+        question: { type: string }
+        options:
+          type: array
+          minItems: 2
+          items: { $ref: '#/components/schemas/PollOption' }
+    Location:
+      type: object
+      additionalProperties: false
+      required: [name, address]
+      properties:
+        name: { type: string }
+        address: { type: string }
+    ChatMessage:
+      type: object
+      additionalProperties: false
+      required: [id, type, senderId, senderName, text, createdAt]
+      properties:
+        id: { type: string }
+        clientTempId: { type: string }
+        type: { type: string, enum: [text, location, eta, poll, system] }
+        senderId: { type: string }
+        senderName: { type: string }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        location: { $ref: '#/components/schemas/Location' }
+        poll: { $ref: '#/components/schemas/Poll' }
+    ChatRoom:
+      type: object
+      additionalProperties: false
+      required: [meetupId, unread, onlineCount, messages]
+      properties:
+        meetupId: { type: string }
+        unread: { type: integer, minimum: 0 }
+        onlineCount: { type: integer, minimum: 0 }
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/ChatMessage' }
+    SendChatMessageInput:
+      type: object
+      additionalProperties: false
+      required: [clientTempId, type, text]
+      properties:
+        clientTempId: { type: string }
+        type: { type: string, enum: [text, location, eta, poll] }
+        text: { type: string }
+        location: { $ref: '#/components/schemas/Location' }
+        poll:
+          type: object
+          additionalProperties: false
+          required: [question, options]
+          properties:
+            question: { type: string }
+            options:
+              type: array
+              minItems: 2
+              items: { type: string }
+    ChatMessagePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ChatMessage' }
+        nextCursor: { type: string }
+    SafetySignalInput:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [grab, sos] }
+        location: { $ref: '#/components/schemas/Location' }
+    SafetySignal:
+      type: object
+      additionalProperties: false
+      required: [id, meetupId, userId, kind, createdAt]
+      properties:
+        id: { type: string }
+        meetupId: { type: string }
+        userId: { type: string }
+        kind: { type: string, enum: [grab, sos] }
+        location: { $ref: '#/components/schemas/Location' }
+        createdAt: { type: string, format: date-time }
+    DemoNotification:
+      type: object
+      additionalProperties: false
+      required: [id, type, title, description, createdAt, read]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [friend_request, friend_accepted, meetup, chat] }
+        title: { type: string }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+        userId: { type: string }
+        meetupId: { type: string }
+    NotificationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DemoNotification' }
+        nextCursor: { type: string }
+    RegisterPushTokenInput:
+      type: object
+      additionalProperties: false
+      required: [token, platform]
+      properties:
+        token: { type: string }
+        platform: { type: string, enum: [android, ios, web] }
+    Review:
+      type: object
+      additionalProperties: false
+      required: [id, author, rating, date, text]
+      properties:
+        id: { type: string }
+        author: { type: string }
+        rating: { type: number, minimum: 0, maximum: 5 }
+        date: { type: string }
+        text: { type: string }
+    DemoAppState:
+      type: object
+      additionalProperties: false
+      required: [version, currentUser, profile, meetups, chats, reviews, users, friendIds, sentFriendRequestIds, receivedFriendRequestIds, blockedUsers, notifications, notificationsEnabled]
+      properties:
+        version: { const: 3 }
+        currentUser:
+          oneOf:
+            - $ref: '#/components/schemas/UserProfile'
+            - type: 'null'
+        profile: { $ref: '#/components/schemas/UserProfile' }
+        meetups:
+          type: array
+          items: { $ref: '#/components/schemas/Meetup' }
+        chats:
+          type: array
+          items: { $ref: '#/components/schemas/ChatRoom' }
+        reviews:
+          type: array
+          items: { $ref: '#/components/schemas/Review' }
+        users:
+          type: array
+          items: { $ref: '#/components/schemas/DemoUser' }
+        friendIds:
+          type: array
+          items: { type: string }
+        sentFriendRequestIds:
+          type: array
+          items: { type: string }
+        receivedFriendRequestIds:
+          type: array
+          items: { type: string }
+        blockedUsers:
+          type: array
+          items: { $ref: '#/components/schemas/UserSummary' }
+        notifications:
+          type: array
+          items: { $ref: '#/components/schemas/DemoNotification' }
+        notificationsEnabled: { type: boolean }
+    MigrationImportRequest:
+      type: object
+      additionalProperties: false
+      required: [storageKey, state]
+      properties:
+        storageKey: { const: '@chillwithhomies/demo-state-v3' }
+        state: { $ref: '#/components/schemas/DemoAppState' }
+    MigrationImportResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, alreadyImported, idMap]
+      properties:
+        ok: { const: true }
+        alreadyImported: { type: boolean }
+        idMap:
+          type: object
+          additionalProperties: { type: string }

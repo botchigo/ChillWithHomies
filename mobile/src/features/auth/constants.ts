@@ -1,6 +1,5 @@
 import type { SignupDraft, SignupStep } from '@/src/features/auth/types';
 
-export const DEMO_OTP = '123456';
 export const SIGNUP_INTERESTS = ['Nhậu', 'Bia', 'Quán ốc', 'Rooftop', 'Lẩu nướng', 'Café', 'Board game', 'Karaoke', 'Nhóm nhỏ', 'Networking', 'Chạy bộ', 'Workshop'] as const;
 export const SIGNUP_VIBES = ['Chill', 'Vui vẻ', 'Nhậu', 'Nhóm nhỏ', 'Làm quen người mới', 'Uống có trách nhiệm'] as const;
 export const AVATAR_COLORS = ['#F28C28', '#E88F9C', '#7C9A65', '#668CB8', '#B583A7', '#D07A72'] as const;

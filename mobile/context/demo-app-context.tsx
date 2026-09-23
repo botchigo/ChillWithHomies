@@ -2,11 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 
 import { createSeedState } from '@/data/demo-data';
+import { completeRemoteSignUp, fetchCurrentProfile, importLegacyState, requestPhoneOtp, signOutRemote, updateRemoteProfile, uploadProfileAvatar, verifyPhoneOtp, type OtpSessionResult } from '@/src/features/auth/services/auth-api';
 import { buildMeetupFromDraft, buildMeetupId } from '@/src/features/sessions/services/meetup-factory';
 import { buildEtaMessage, buildLocationMessage, buildPollMessage, buildSystemMessage, buildTextMessage } from '@/src/features/chat/services/chat-factory';
 import { createId } from '@/src/shared/utils/ids';
+import { getSupabaseClient, isSupabaseConfigured, registerSupabaseAuthAutoRefresh } from '@/src/shared/api/client';
 import { loadDemoState, saveDemoState } from '@/src/shared/persistence/demo-state-storage';
-import { normalizePhone, normalizeUsername, validateCompleteSignUp, validateSignInCredentials } from '@/src/features/auth/services/auth-validation';
+import { validateCompleteSignUp } from '@/src/features/auth/services/auth-validation';
 import type { CompleteSignUpInput } from '@/src/features/auth/types';
 import type { ChatMessage } from '@/src/features/chat/types';
 import type { UserProfile } from '@/src/features/profile/types';
@@ -22,9 +24,10 @@ type DemoAppContextValue = {
   toast: string;
   dismissToast: () => void;
   notify: (message: string) => void;
-  signIn: (phone: string, password: string) => ActionResult;
-  completeSignUp: (input: CompleteSignUpInput) => ActionResult;
-  signOut: () => void;
+  requestOtp: (phone: string) => Promise<ActionResult>;
+  verifyOtp: (phone: string, token: string) => Promise<OtpSessionResult>;
+  completeSignUp: (input: CompleteSignUpInput) => Promise<ActionResult>;
+  signOut: () => Promise<void>;
   updateProfile: (input: Pick<UserProfile, 'name' | 'username' | 'bio' | 'city'>) => void;
   updateInterests: (interests: string[]) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
@@ -60,6 +63,13 @@ type DemoAppContextValue = {
 
 const DemoAppContext = createContext<DemoAppContextValue | null>(null);
 
+function applyRemoteProfile(current: DemoAppState, profile: UserProfile): DemoAppState {
+  const users = current.users.some((user) => user.id === profile.id)
+    ? current.users.map((user) => user.id === profile.id ? { ...user, ...profile } : user)
+    : [...current.users, { ...profile, friendIds: [] }];
+  return { ...current, profile, currentUser: profile, users };
+}
+
 export function DemoAppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DemoAppState>(() => createSeedState());
   const [hydrated, setHydrated] = useState(false);
@@ -67,11 +77,39 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true;
-    loadDemoState()
-      .then((storedState) => { if (alive && storedState) setState(storedState); })
-      .catch(() => { if (alive) setToast('Không thể khôi phục dữ liệu demo. Ứng dụng đang dùng dữ liệu mặc định.'); })
-      .finally(() => { if (alive) setHydrated(true); });
-    return () => { alive = false; };
+    let stopAutoRefresh: () => void = () => undefined;
+    let unsubscribe: () => void = () => undefined;
+    const hydrate = async () => {
+      let nextState = createSeedState();
+      try {
+        nextState = (await loadDemoState()) ?? nextState;
+      } catch {
+        if (alive) setToast('Không thể khôi phục dữ liệu demo. Ứng dụng đang dùng dữ liệu mặc định.');
+      }
+
+      if (isSupabaseConfigured()) {
+        const supabase = getSupabaseClient();
+        stopAutoRefresh = registerSupabaseAuthAutoRefresh();
+        const session = await supabase.auth.getSession();
+        nextState = { ...nextState, currentUser: null };
+        if (session.data.session) {
+          const remote = await fetchCurrentProfile();
+          if (remote.ok && remote.data) nextState = applyRemoteProfile(nextState, remote.data);
+        }
+        const listener = supabase.auth.onAuthStateChange((event) => {
+          if (!alive || event !== 'SIGNED_OUT') return;
+          setState((current) => ({ ...current, currentUser: null }));
+        });
+        unsubscribe = () => listener.data.subscription.unsubscribe();
+      }
+
+      if (alive) {
+        setState(nextState);
+        setHydrated(true);
+      }
+    };
+    void hydrate();
+    return () => { alive = false; stopAutoRefresh(); unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -82,55 +120,46 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
   const notify = useCallback((message: string) => setToast(message), []);
   const dismissToast = useCallback(() => setToast(''), []);
 
-  const signIn = useCallback((phone: string, password: string): ActionResult => {
-    const validation = validateSignInCredentials(phone, password);
-    if (!validation.ok) return validation;
-    setState((current) => {
-      const profile = { ...current.profile, phone: phone.replace(/\s/g, '') };
-      return { ...current, profile, currentUser: profile };
-    });
-    return { ok: true };
-  }, []);
+  const requestOtp = useCallback((phone: string) => requestPhoneOtp(phone), []);
 
-  const completeSignUp = useCallback((input: CompleteSignUpInput): ActionResult => {
-    const validation = validateCompleteSignUp(input, state.users.map((user) => user.username));
+  const verifyOtp = useCallback(async (phone: string, token: string): Promise<OtpSessionResult> => {
+    const result = await verifyPhoneOtp(phone, token);
+    if (!result.ok) return result;
+    await importLegacyState(state);
+    if (result.profileComplete) {
+      const remote = await fetchCurrentProfile();
+      if (!remote.ok || !remote.data) return { ok: false, error: remote.error ?? 'Không thể tải hồ sơ.' };
+      setState((current) => applyRemoteProfile(current, remote.data!));
+    }
+    return result;
+  }, [state]);
+
+  const completeSignUp = useCallback(async (input: CompleteSignUpInput): Promise<ActionResult> => {
+    const validation = validateCompleteSignUp(input, []);
     if (!validation.ok) return validation;
-    const username = normalizeUsername(input.username).toLowerCase();
-    const userId = `user-${username}-${Date.now().toString(36)}`;
-    const profile: UserProfile = {
-      id: userId,
-      name: input.name.trim(),
-      username,
-      phone: normalizePhone(input.phone),
-      bio: input.bio.trim(),
-      city: input.city.trim(),
-      interests: input.interests,
-      dateOfBirth: input.dateOfBirth,
-      verifiedPhone: true,
-      preferredVibes: input.preferredVibes,
-      avatarColor: input.avatarColor,
-      avatarUri: input.avatarUri,
-      verified: false,
-    };
+    let avatarUri = input.avatarUri;
+    if (avatarUri && !avatarUri.startsWith('http')) {
+      const upload = await uploadProfileAvatar(avatarUri);
+      if (!upload.ok || !upload.data) return { ok: false, error: upload.error ?? 'Không thể tải ảnh đại diện lên.' };
+      avatarUri = upload.data;
+    }
+    const remote = await completeRemoteSignUp({ ...input, avatarUri });
+    if (!remote.ok || !remote.data) return { ok: false, error: remote.error ?? 'Không thể tạo tài khoản.' };
     setState((current) => ({
-      ...current,
-      currentUser: profile,
-      profile,
-      users: [...current.users, { ...profile, friendIds: [] }],
-      friendIds: [],
-      sentFriendRequestIds: [],
-      receivedFriendRequestIds: [],
-      blockedUsers: [],
-      reviews: [],
-      notifications: [],
+      ...applyRemoteProfile(current, remote.data!),
+      friendIds: [], sentFriendRequestIds: [], receivedFriendRequestIds: [], blockedUsers: [], reviews: [], notifications: [],
       notificationsEnabled: input.notificationsEnabled,
     }));
     return { ok: true };
-  }, [state.users]);
+  }, []);
 
-  const signOut = useCallback(() => setState((current) => ({ ...current, currentUser: null })), []);
+  const signOut = useCallback(async () => {
+    await signOutRemote();
+    setState((current) => ({ ...current, currentUser: null }));
+  }, []);
 
   const updateProfile = useCallback((input: Pick<UserProfile, 'name' | 'username' | 'bio' | 'city'>) => {
+    const previous = state.profile;
     setState((current) => {
       const profile = { ...current.profile, ...input };
       const syncUser = (user: { id: string; name: string; username: string; avatarColor: string; verified?: boolean }) => user.id === profile.id
@@ -154,8 +183,16 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
         } : user),
       };
     });
-    notify('Đã lưu thay đổi hồ sơ.');
-  }, [notify]);
+    void updateRemoteProfile(input).then((result) => {
+      if (result.ok && result.data) {
+        setState((current) => applyRemoteProfile(current, result.data!));
+        notify('Đã lưu thay đổi hồ sơ.');
+      } else {
+        setState((current) => applyRemoteProfile(current, previous));
+        notify(result.error ?? 'Không thể lưu thay đổi hồ sơ.');
+      }
+    });
+  }, [notify, state.profile]);
 
   const updateInterests = useCallback((interests: string[]) => {
     setState((current) => ({
@@ -164,10 +201,13 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
       currentUser: current.currentUser ? { ...current.currentUser, interests } : null,
       users: current.users.map((user) => user.id === current.profile.id ? { ...user, interests } : user),
     }));
-    notify('Đã cập nhật sở thích.');
+    void updateRemoteProfile({ interests }).then((result) => notify(result.ok ? 'Đã cập nhật sở thích.' : result.error ?? 'Không thể cập nhật sở thích.'));
   }, [notify]);
 
-  const setNotificationsEnabled = useCallback((enabled: boolean) => setState((current) => ({ ...current, notificationsEnabled: enabled })), []);
+  const setNotificationsEnabled = useCallback((enabled: boolean) => {
+    setState((current) => ({ ...current, notificationsEnabled: enabled }));
+    void updateRemoteProfile({ notificationsEnabled: enabled });
+  }, []);
   const unblockUser = useCallback((userId: string) => {
     setState((current) => ({ ...current, blockedUsers: current.blockedUsers.filter((user) => user.id !== userId) }));
     notify('Đã bỏ chặn tài khoản.');
@@ -542,13 +582,13 @@ export function DemoAppProvider({ children }: { children: ReactNode }) {
   }, [state.chats, state.currentUser, state.meetups]);
 
   const value = useMemo<DemoAppContextValue>(() => ({
-    state, hydrated, toast, dismissToast, notify, signIn, completeSignUp, signOut, updateProfile, updateInterests,
+    state, hydrated, toast, dismissToast, notify, requestOtp, verifyOtp, completeSignUp, signOut, updateProfile, updateInterests,
     setNotificationsEnabled, unblockUser, sendFriendRequest, cancelFriendRequest, acceptFriendRequest,
     rejectFriendRequest, unfriendUser, blockUser, markNotificationRead, markAllNotificationsRead,
     resetDemoData, joinMeetup, leaveMeetup, emergencyLeave, createMeetup, toggleTableBooked, sendBillNote,
     checkIn, setBillTotal, markMyPayment, confirmPayment, sendSafetySignal,
     sendMessage, sendLocation, sendEta, createPoll, votePoll, markRoomRead, ensureChatRoom,
-  }), [state, hydrated, toast, dismissToast, notify, signIn, completeSignUp, signOut, updateProfile, updateInterests,
+  }), [state, hydrated, toast, dismissToast, notify, requestOtp, verifyOtp, completeSignUp, signOut, updateProfile, updateInterests,
     setNotificationsEnabled, unblockUser, sendFriendRequest, cancelFriendRequest, acceptFriendRequest,
     rejectFriendRequest, unfriendUser, blockUser, markNotificationRead, markAllNotificationsRead,
     resetDemoData, joinMeetup, leaveMeetup, emergencyLeave, createMeetup, toggleTableBooked, sendBillNote, checkIn, setBillTotal, markMyPayment, confirmPayment, sendSafetySignal, sendMessage, sendLocation, sendEta, createPoll,

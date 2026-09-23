@@ -1,6 +1,7 @@
 # ChillWithHomies
 
-Demo app tìm, tạo và tham gia meetup tại TP.HCM, xây bằng React Native, Expo SDK 57 và Expo Router. Mã ứng dụng nằm trong `mobile/`.
+Ứng dụng tìm, tạo và tham gia meetup tại TP.HCM, xây bằng React Native, Expo SDK 57 và Expo Router. Mã ứng dụng
+nằm trong `mobile/`; khung Supabase và API contract nằm trong [`backend/`](backend/README.md).
 
 ## Cài đặt và chạy
 
@@ -25,9 +26,9 @@ npm.cmd start
 
 Quét QR bằng Expo Go, hoặc nhấn `a` để mở Android emulator. Native build có thể chạy bằng `npm.cmd run android`; `npm.cmd run ios` cần macOS và Xcode.
 
-## Đăng nhập demo
+## Đăng nhập bằng OTP
 
-Không có tài khoản cố định. Dùng số điện thoại hợp lệ gồm 9–11 chữ số và mật khẩu từ 6 ký tự, ví dụ `0901234567` / `chill123`. Tại `/signup`, luồng onboarding 5 bước dùng OTP demo `123456`, kiểm tra username, cho chọn ảnh đại diện, tự định dạng ngày sinh `MM-DD-YYYY`, thu thập sở thích và yêu cầu đồng ý an toàn trước khi tạo tài khoản. Tiến trình được lưu để tiếp tục sau khi reload; password và OTP không được lưu.
+Ứng dụng chỉ đăng nhập bằng OTP gửi tới số điện thoại Việt Nam; không có mật khẩu hoặc mã OTP hard-code. Tại `/signup`, luồng onboarding 5 bước kiểm tra username trên server, tải ảnh đại diện vào bucket private, xác thực người dùng đủ 18 tuổi, thu thập sở thích và yêu cầu đồng ý an toàn trước khi tạo tài khoản. Tiến trình onboarding được lưu cục bộ để có thể tiếp tục sau khi reload, nhưng mã OTP không được lưu.
 
 ## Route chính
 
@@ -54,4 +55,4 @@ npm.cmd test
 npx.cmd expo export --platform web
 ```
 
-Bản web production được xuất vào `mobile/dist/`. Đây là demo local-first, chưa có backend, realtime server, SMS hay thanh toán thật.
+Bản web production được xuất vào `mobile/dist/`. Auth, hồ sơ và avatar dùng Supabase; các module meetup/chat/social vẫn đang được chuyển dần khỏi dữ liệu local theo từng phase. Bill chỉ là demo ledger, không có thanh toán thật.

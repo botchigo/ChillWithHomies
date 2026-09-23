@@ -8,27 +8,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton, AppInput, Chip, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
-import { AVATAR_COLORS, createInitialSignupDraft, DEMO_OTP, SIGNUP_INTERESTS, SIGNUP_STEP_NUMBER, SIGNUP_VIBES } from '@/src/features/auth/constants';
+import { AVATAR_COLORS, createInitialSignupDraft, SIGNUP_INTERESTS, SIGNUP_STEP_NUMBER, SIGNUP_VIBES } from '@/src/features/auth/constants';
 import { useAuth } from '@/src/features/auth/hooks/use-auth';
+import { checkUsernameAvailability } from '@/src/features/auth/services/auth-api';
 import { formatDateOfBirthInput, formatPhone, isUsernameValid, normalizeUsername, validateBasicProfile, validateSignupAccount } from '@/src/features/auth/services/auth-validation';
 import { clearSignupDraft, loadSignupDraft, saveSignupDraft } from '@/src/features/auth/services/signup-draft-storage';
 import type { SignupDraft, SignupStep, UsernameStatus } from '@/src/features/auth/types';
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { hydrated, currentUser, users, completeSignUp, notify } = useAuth();
+  const { hydrated, currentUser, requestOtp, verifyOtp: verifyPhoneOtp, completeSignUp, notify } = useAuth();
   const [draft, setDraft] = useState<SignupDraft>(createInitialSignupDraft);
   const [draftHydrated, setDraftHydrated] = useState(false);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [accountTouched, setAccountTouched] = useState({ phone: false, password: false, confirm: false });
+  const [accountTouched, setAccountTouched] = useState({ phone: false });
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpError, setOtpError] = useState('');
   const [countdown, setCountdown] = useState(60);
   const [verifying, setVerifying] = useState(false);
-  const [usernameCheck, setUsernameCheck] = useState<{ value: string; taken: boolean } | null>(null);
+  const [usernameCheck, setUsernameCheck] = useState<{ value: string; taken: boolean; failed?: boolean } | null>(null);
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
   const [interestError, setInterestError] = useState('');
   const [consentAttempted, setConsentAttempted] = useState(false);
@@ -63,21 +60,28 @@ export default function SignUpScreen() {
   useEffect(() => {
     const username = normalizeUsername(draft.username);
     if (draft.step !== 'profile' || !isUsernameValid(username)) return;
+    let active = true;
     const timer = setTimeout(() => {
-      const taken = users.some((user) => user.username.toLowerCase() === username.toLowerCase());
-      setUsernameCheck({ value: username.toLowerCase(), taken });
+      void checkUsernameAvailability(username).then((result) => {
+        if (!active) return;
+        if (!result.ok || !result.data) {
+          setUsernameCheck({ value: username.toLowerCase(), taken: false, failed: true });
+          return;
+        }
+        setUsernameCheck({ value: username.toLowerCase(), taken: !result.data.available });
+      });
     }, 450);
-    return () => clearTimeout(timer);
-  }, [draft.step, draft.username, users]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [draft.step, draft.username]);
 
-  const accountErrors = useMemo(() => validateSignupAccount(draft.phone, password, confirmPassword), [confirmPassword, draft.phone, password]);
-  const accountValid = !accountErrors.phone && !accountErrors.password && !accountErrors.confirm;
+  const accountErrors = useMemo(() => validateSignupAccount(draft.phone), [draft.phone]);
+  const accountValid = !accountErrors.phone;
   const normalizedUsername = normalizeUsername(draft.username).toLowerCase();
   const usernameStatus: UsernameStatus = draft.step !== 'profile' || !isUsernameValid(normalizedUsername)
     ? 'idle'
     : usernameCheck?.value !== normalizedUsername
       ? 'checking'
-      : usernameCheck.taken ? 'taken' : 'available';
+      : usernameCheck.failed ? 'idle' : usernameCheck.taken ? 'taken' : 'available';
   const currentStep = draft.step === 'complete' ? 5 : SIGNUP_STEP_NUMBER[draft.step];
 
   const updateDraft = (values: Partial<SignupDraft>) => setDraft((current) => ({ ...current, ...values }));
@@ -91,10 +95,18 @@ export default function SignUpScreen() {
     if (draft.step === 'safety') return setStep('interests');
   };
 
-  const continueAccount = () => {
+  const continueAccount = async () => {
     if (!accountValid) return;
+    setVerifying(true);
+    const result = await requestOtp(draft.phone);
+    setVerifying(false);
+    if (!result.ok) {
+      notify(result.error ?? 'Không thể gửi mã xác thực. Vui lòng thử lại.');
+      return;
+    }
     updateDraft({ step: 'verify' });
     setOtpError('');
+    setCountdown(60);
   };
 
   const changeOtp = (index: number, value: string) => {
@@ -114,9 +126,9 @@ export default function SignUpScreen() {
   const verifyOtp = async () => {
     if (otp.join('').length !== 6) return setOtpError('Vui lòng nhập đủ 6 chữ số.');
     setVerifying(true);
-    await delay(550);
-    if (otp.join('') !== DEMO_OTP) {
-      setOtpError('Mã xác thực không đúng.');
+    const result = await verifyPhoneOtp(draft.phone, otp.join(''));
+    if (!result.ok) {
+      setOtpError(result.error ?? 'Mã xác thực không đúng hoặc đã hết hạn.');
       setVerifying(false);
       return;
     }
@@ -125,16 +137,23 @@ export default function SignUpScreen() {
     notify('Xác thực số điện thoại thành công.');
   };
 
-  const resendOtp = () => {
+  const resendOtp = async () => {
+    setVerifying(true);
+    const result = await requestOtp(draft.phone);
+    setVerifying(false);
+    if (!result.ok) {
+      setOtpError(result.error ?? 'Không thể gửi lại mã xác thực.');
+      return;
+    }
     setOtp(['', '', '', '', '', '']);
     setOtpError('');
     setCountdown(60);
     otpRefs.current[0]?.focus();
-    notify('Đã gửi lại mã xác thực demo.');
+    notify('Đã gửi lại mã xác thực.');
   };
 
   const continueProfile = () => {
-    const errors = validateBasicProfile(draft, users.map((user) => user.username));
+    const errors = validateBasicProfile(draft, []);
     setProfileErrors(errors);
     if (Object.keys(errors).length || usernameStatus === 'checking') return;
     setStep('interests');
@@ -162,7 +181,7 @@ export default function SignUpScreen() {
     setCreating(true);
     await delay(650);
     setCompletionInProgress(true);
-    const result = completeSignUp({
+    const result = await completeSignUp({
       phone: draft.phone,
       name: draft.name,
       username: draft.username,
@@ -206,7 +225,7 @@ export default function SignUpScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {draft.step === 'account' ? <AccountStep draft={draft} updateDraft={updateDraft} password={password} setPassword={setPassword} confirmPassword={confirmPassword} setConfirmPassword={setConfirmPassword} showPassword={showPassword} setShowPassword={setShowPassword} showConfirm={showConfirm} setShowConfirm={setShowConfirm} touched={accountTouched} setTouched={setAccountTouched} errors={accountErrors} valid={accountValid} onContinue={continueAccount} /> : null}
+          {draft.step === 'account' ? <AccountStep draft={draft} updateDraft={updateDraft} touched={accountTouched} setTouched={setAccountTouched} errors={accountErrors} valid={accountValid} loading={verifying} onContinue={continueAccount} /> : null}
           {draft.step === 'verify' ? <VerifyStep phone={draft.phone} verified={draft.phoneVerified} otp={otp} refs={otpRefs} error={otpError} countdown={countdown} loading={verifying} onChange={changeOtp} onVerify={verifyOtp} onResend={resendOtp} onContinue={() => setStep('profile')} onChangePhone={() => updateDraft({ step: 'account', phoneVerified: false })} /> : null}
           {draft.step === 'profile' ? <ProfileStep draft={draft} updateDraft={updateDraft} errors={profileErrors} setErrors={setProfileErrors} usernameStatus={usernameStatus} onContinue={continueProfile} /> : null}
           {draft.step === 'interests' ? <InterestsStep draft={draft} error={interestError} onToggleInterest={toggleInterest} onToggleVibe={toggleVibe} onContinue={continueInterests} /> : null}
@@ -217,18 +236,15 @@ export default function SignUpScreen() {
   );
 }
 
-function AccountStep({ draft, updateDraft, password, setPassword, confirmPassword, setConfirmPassword, showPassword, setShowPassword, showConfirm, setShowConfirm, touched, setTouched, errors, valid, onContinue }: {
-  draft: SignupDraft; updateDraft: (values: Partial<SignupDraft>) => void; password: string; setPassword: (value: string) => void; confirmPassword: string; setConfirmPassword: (value: string) => void;
-  showPassword: boolean; setShowPassword: (value: boolean) => void; showConfirm: boolean; setShowConfirm: (value: boolean) => void;
-  touched: { phone: boolean; password: boolean; confirm: boolean }; setTouched: React.Dispatch<React.SetStateAction<{ phone: boolean; password: boolean; confirm: boolean }>>;
-  errors: Record<string, string>; valid: boolean; onContinue: () => void;
+function AccountStep({ draft, updateDraft, touched, setTouched, errors, valid, loading, onContinue }: {
+  draft: SignupDraft; updateDraft: (values: Partial<SignupDraft>) => void;
+  touched: { phone: boolean }; setTouched: React.Dispatch<React.SetStateAction<{ phone: boolean }>>;
+  errors: Record<string, string>; valid: boolean; loading: boolean; onContinue: () => Promise<void>;
 }) {
-  return <StepShell icon="user-plus" eyebrow="TẠO TÀI KHOẢN" title="Bắt đầu với số điện thoại" subtitle="Thông tin đăng nhập chỉ dùng để bảo vệ tài khoản demo của bạn.">
+  return <StepShell icon="user-plus" eyebrow="TẠO TÀI KHOẢN" title="Bắt đầu với số điện thoại" subtitle="Chúng tôi sẽ gửi mã OTP để xác thực số điện thoại của bạn.">
     <AppInput label="Số điện thoại" icon="phone" value={draft.phone} onChangeText={(phone) => updateDraft({ phone, phoneVerified: false })} onBlur={() => setTouched((current) => ({ ...current, phone: true }))} keyboardType="phone-pad" autoComplete="tel" placeholder="0901 234 567" error={touched.phone ? errors.phone : undefined} hint={!touched.phone ? 'Dùng số di động Việt Nam bắt đầu bằng 03, 05, 07, 08 hoặc 09.' : undefined} />
-    <PasswordField label="Mật khẩu" value={password} onChangeText={setPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} error={touched.password ? errors.password : undefined} hint={!touched.password ? 'Ít nhất 8 ký tự, có cả chữ và số.' : undefined} />
-    <PasswordField label="Xác nhận mật khẩu" value={confirmPassword} onChangeText={setConfirmPassword} visible={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} onBlur={() => setTouched((current) => ({ ...current, confirm: true }))} error={touched.confirm ? errors.confirm : undefined} />
-    <View style={styles.secureNote}><FontAwesome name="lock" size={13} color={AppColors.success} /><Text style={styles.secureText}>Password và OTP không được lưu vào bộ nhớ thiết bị.</Text></View>
-    <AppButton label="Tiếp tục" icon="arrow-right" disabled={!valid} onPress={onContinue} />
+    <View style={styles.secureNote}><FontAwesome name="lock" size={13} color={AppColors.success} /><Text style={styles.secureText}>OTP chỉ dùng một lần và không được lưu vào bộ nhớ thiết bị.</Text></View>
+    <AppButton label="Gửi mã OTP" icon="arrow-right" loading={loading} disabled={!valid} onPress={onContinue} />
   </StepShell>;
 }
 
@@ -240,7 +256,6 @@ function VerifyStep({ phone, verified, otp, refs, error, countdown, loading, onC
     {verified ? <View style={styles.verifiedCard}><FontAwesome name="check-circle" size={24} color={AppColors.success} /><View style={{ flex: 1 }}><Text style={styles.verifiedTitle}>Xác thực thành công</Text><Text style={styles.verifiedText}>Bạn có thể tiếp tục hoàn thiện hồ sơ.</Text></View></View> : <>
       <View style={styles.otpRow}>{otp.map((digit, index) => <TextInput key={index} ref={(input) => { refs.current[index] = input; }} accessibilityLabel={`Chữ số OTP ${index + 1}`} value={digit} onChangeText={(value) => onChange(index, value)} onKeyPress={({ nativeEvent }) => { if (nativeEvent.key === 'Backspace' && !digit && index > 0) refs.current[index - 1]?.focus(); }} keyboardType="number-pad" textContentType={index === 0 ? 'oneTimeCode' : 'none'} autoComplete={index === 0 ? 'one-time-code' : 'off'} maxLength={6} selectTextOnFocus style={[styles.otpInput, !!error && styles.otpInputError]} />)}</View>
       {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
-      <Text style={styles.demoOtp}>Demo OTP: <Text style={styles.demoOtpValue}>123456</Text></Text>
       <View style={styles.resendRow}><Text style={styles.resendHint}>{countdown > 0 ? `Có thể gửi lại sau ${countdown}s` : 'Bạn chưa nhận được mã?'}</Text><Pressable accessibilityRole="button" disabled={countdown > 0} onPress={onResend} style={({ pressed }) => [styles.resendButton, countdown > 0 && styles.disabled, pressed && styles.pressed]}><Text style={styles.resendLabel}>Gửi lại mã</Text></Pressable></View>
     </>}
     <AppButton label={verified ? 'Tiếp tục' : 'Xác thực'} icon={verified ? 'arrow-right' : 'check'} loading={loading} disabled={!verified && otp.join('').length !== 6} onPress={verified ? onContinue : onVerify} />
@@ -347,11 +362,6 @@ function CompleteScreen({ name, interests, onContinue }: { name: string; interes
 
 function StepShell({ icon, eyebrow, title, subtitle, children }: { icon: React.ComponentProps<typeof FontAwesome>['name']; eyebrow: string; title: string; subtitle: string; children: React.ReactNode }) {
   return <View style={styles.step}><View style={styles.stepIcon}><FontAwesome name={icon} size={21} color={AppColors.accent} /></View><Text style={styles.eyebrow}>{eyebrow}</Text><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text><SurfaceCard style={styles.form}>{children}</SurfaceCard></View>;
-}
-
-function PasswordField({ label, value, onChangeText, visible, onToggle, onBlur, error, hint }: { label: string; value: string; onChangeText: (value: string) => void; visible: boolean; onToggle: () => void; onBlur: () => void; error?: string; hint?: string }) {
-  const [focused, setFocused] = useState(false);
-  return <View style={styles.field}><Text style={styles.label}>{label}</Text><View style={[styles.inputShell, focused && styles.inputFocused, !!error && styles.inputError]}><FontAwesome name="lock" size={16} color={error ? AppColors.danger : AppColors.textSecondary} /><TextInput accessibilityLabel={label} value={value} onChangeText={onChangeText} secureTextEntry={!visible} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" placeholder="Ít nhất 8 ký tự" placeholderTextColor="#AA998A" onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); onBlur(); }} style={styles.passwordInput} /><Pressable accessibilityRole="button" accessibilityLabel={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onPress={onToggle} hitSlop={8} style={({ pressed }) => [styles.eye, pressed && styles.pressed]}><FontAwesome name={visible ? 'eye' : 'eye-slash'} size={17} color={AppColors.textSecondary} /></Pressable></View>{error || hint ? <Text accessibilityLiveRegion="polite" style={[styles.helper, error && styles.helperError]}>{error || hint}</Text> : null}</View>;
 }
 
 function Checkbox({ checked, label, onPress, error = false }: { checked: boolean; label: string; onPress: () => void; error?: boolean }) {

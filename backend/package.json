@@ -1,0 +1,16 @@
+{
+  "name": "chillwithhomies-backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint:openapi": "redocly lint openapi.yaml",
+    "test:api": "node --env-file-if-exists=.env --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.54.2",
+    "supabase": "^2.117.0"
+  },
+  "engines": {
+    "node": "^22.13.0 || ^24.3.0 || >=25.0.0"
+  }
+}

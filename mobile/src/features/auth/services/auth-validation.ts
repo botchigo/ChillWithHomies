@@ -58,15 +58,10 @@ export function formatDateOfBirthInput(value: string, previous: string) {
   return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
 }
 
-export function validateSignupAccount(phone: string, password: string, confirmPassword: string) {
+export function validateSignupAccount(phone: string) {
   const errors: Record<string, string> = {};
   if (!phone.trim()) errors.phone = 'Vui lòng nhập số điện thoại.';
   else if (!isVietnamPhoneValid(phone)) errors.phone = 'Số điện thoại không hợp lệ.';
-  if (!password) errors.password = 'Vui lòng nhập mật khẩu.';
-  else if (password.length < 8) errors.password = 'Mật khẩu phải có ít nhất 8 ký tự.';
-  else if (!/\p{L}/u.test(password) || !/\d/.test(password)) errors.password = 'Mật khẩu cần có ít nhất một chữ và một số.';
-  if (!confirmPassword) errors.confirm = 'Vui lòng xác nhận mật khẩu.';
-  else if (confirmPassword !== password) errors.confirm = 'Mật khẩu xác nhận không khớp.';
   return errors;
 }
 
@@ -88,12 +83,6 @@ export function validateBasicProfile(draft: SignupDraft, usernames: string[]) {
   if (!draft.city.trim()) errors.city = 'Vui lòng nhập thành phố.';
   if (draft.bio.length > 160) errors.bio = 'Giới thiệu không được quá 160 ký tự.';
   return errors;
-}
-
-export function validateSignInCredentials(phone: string, password: string): ActionResult {
-  if (!/^[0-9]{9,11}$/.test(phone.replace(/\s/g, ''))) return { ok: false, error: 'Số điện thoại cần có 9–11 chữ số.' };
-  if (password.trim().length < 6) return { ok: false, error: 'Mật khẩu cần ít nhất 6 ký tự.' };
-  return { ok: true };
 }
 
 export function validateCompleteSignUp(input: CompleteSignUpInput, usernames: string[]): ActionResult {

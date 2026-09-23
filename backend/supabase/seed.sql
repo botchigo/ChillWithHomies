@@ -1,0 +1,1 @@
+-- Seed data is introduced with the feature schema migrations.

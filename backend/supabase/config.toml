@@ -1,0 +1,18 @@
+project_id = "chillwithhomies"
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+additional_redirect_urls = ["mobile://**", "exp://127.0.0.1:8081/**"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+
+[auth.sms.test_otp]
+84901234567 = "123456"
+
+[functions.api]
+verify_jwt = false
