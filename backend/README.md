@@ -22,6 +22,9 @@ npx.cmd supabase start
 publishable key. Copy the public values into `mobile/.env` using `mobile/.env.example`; never put a service-role
 key in the Expo app.
 
+Local Phone Auth uses OTP `123456` for `0901234567` (existing smoke-test profile) and `0987654321` (fresh signup).
+These test numbers are local-only and do not configure SMS delivery for Cloud projects.
+
 Useful commands:
 
 ```powershell

@@ -13,6 +13,14 @@ enable_confirmations = true
 
 [auth.sms.test_otp]
 84901234567 = "123456"
+84987654321 = "123456"
+
+# Local-only placeholder. Test OTP numbers are intercepted before this provider is called.
+# Cloud projects must use real credentials configured in the Supabase dashboard.
+[auth.sms.messagebird]
+enabled = true
+originator = "ChillHomies"
+access_key = "local-test-only"
 
 [functions.api]
 verify_jwt = false
