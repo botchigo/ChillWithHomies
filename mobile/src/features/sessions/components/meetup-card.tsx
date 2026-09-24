@@ -1,8 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Alert, Platform, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Badge } from '@/src/shared/components/ui/app-primitives';
+import { Badge, ConfirmDialog } from '@/src/shared/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
 import { useMeetupParticipation } from '@/src/features/sessions/hooks/use-meetup-participation';
 import { formatDistance, formatVND, getUnpaidShares } from '@/src/features/sessions/services/session-rules';
@@ -16,31 +17,20 @@ export function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () =>
   const isJoined = !!currentUserId && meetup.participants.some((participant) => participant.id === currentUserId);
   const isFull = meetup.participants.length >= meetup.maxParticipants;
   const isEnded = meetup.status === 'ended';
+  const [confirmLeaveVisible, setConfirmLeaveVisible] = useState(false);
 
   const leave = () => {
     const result = leaveMeetup(meetup.id);
     if (!result.ok && result.error) notify(result.error);
   };
 
-  const handleParticipation = (event: GestureResponderEvent) => {
-    event.stopPropagation();
+  const handleParticipation = () => {
     if (isHost) {
       notify('Bạn là host của meetup này.');
       return;
     }
     if (isJoined) {
-      if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
-        if (globalThis.confirm('Rời kèo này? Bạn sẽ không còn thấy phòng chat của meetup trong danh sách.')) leave();
-        return;
-      }
-      Alert.alert(
-        'Rời kèo này?',
-        'Bạn sẽ không còn thấy phòng chat của meetup trong danh sách.',
-        [
-          { text: 'Ở lại', style: 'cancel' },
-          { text: 'Rời kèo', style: 'destructive', onPress: leave },
-        ],
-      );
+      setConfirmLeaveVisible(true);
       return;
     }
     const result = joinMeetup(meetup.id);
@@ -59,6 +49,7 @@ export function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () =>
   const disabled = isEnded || (isFull && !isJoined);
 
   return (
+    <>
     <View style={styles.card}>
       <Pressable
         accessibilityRole="button"
@@ -108,6 +99,17 @@ export function MeetupCard({ meetup, onPress }: { meetup: Meetup; onPress: () =>
         </Pressable>
       </View>
     </View>
+    <ConfirmDialog
+      visible={confirmLeaveVisible}
+      title="Rời kèo này?"
+      message="Bạn sẽ không còn thấy phòng chat của meetup trong danh sách."
+      cancelLabel="Ở lại"
+      confirmLabel="Rời kèo"
+      destructive
+      onCancel={() => setConfirmLeaveVisible(false)}
+      onConfirm={() => { setConfirmLeaveVisible(false); leave(); }}
+    />
+    </>
   );
 }
 

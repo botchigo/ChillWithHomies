@@ -2,10 +2,10 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Redirect, type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton, AppInput, Badge, BottomSheet, Chip, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
+import { AppButton, AppInput, Badge, BottomSheet, Chip, ConfirmDialog, IconButton, SurfaceCard } from '@/components/ui/app-primitives';
 import { AppColors, FontFamily, Radius, TypeScale, WarmShadow } from '@/constants/theme';
 import { useSafety } from '@/src/features/safety/hooks/use-safety';
 import { useMeetupDetails } from '@/src/features/sessions/hooks/use-meetup-details';
@@ -28,6 +28,8 @@ export default function MeetupDetailScreen() {
   const [billSheet, setBillSheet] = useState(false);
   const [billTotalInput, setBillTotalInput] = useState('');
   const [billError, setBillError] = useState('');
+  const [leaveDialog, setLeaveDialog] = useState(false);
+  const [emergencyDialog, setEmergencyDialog] = useState(false);
 
   const goBack = () => router.canGoBack() ? router.back() : router.replace('/');
 
@@ -67,32 +69,12 @@ export default function MeetupDetailScreen() {
     const result = leaveMeetup(meetup.id);
     if (!result.ok && result.error) notify(result.error);
   };
-  const confirmLeave = () => {
-    if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
-      if (globalThis.confirm(`Rời kèo này? Bạn sẽ mất cọc demo ${deposit.toLocaleString('vi-VN')}đ cho quỹ chung.`)) leave();
-      return;
-    }
-    Alert.alert(
-      'Rời kèo này?',
-      deposit > 0 ? `Bạn sẽ mất cọc ${deposit.toLocaleString('vi-VN')}đ (demo) chia cho người ở lại.` : 'Bạn sẽ không còn thấy phòng chat của meetup trong danh sách.',
-      [
-        { text: 'Ở lại', style: 'cancel' },
-        { text: 'Rời kèo', style: 'destructive', onPress: leave },
-      ],
-    );
-  };
-  const confirmEmergency = () => {
-    if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
-      if (globalThis.confirm('Rời khẩn? App sẽ không báo tên bạn trong chat, chỉ báo chung.')) {
-        const r = emergencyLeave(meetup.id);
-        if (!r.ok && r.error) notify(r.error);
-      }
-      return;
-    }
-    Alert.alert('Rời khẩn an toàn?', 'Tên bạn sẽ không hiện trong chat. Vị trí quán được gửi cho người thân (demo).', [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Rời khẩn', style: 'destructive', onPress: () => { const r = emergencyLeave(meetup.id); if (!r.ok && r.error) notify(r.error); } },
-    ]);
+  const confirmLeave = () => setLeaveDialog(true);
+  const confirmEmergency = () => setEmergencyDialog(true);
+  const runEmergencyLeave = () => {
+    setEmergencyDialog(false);
+    const result = emergencyLeave(meetup.id);
+    if (!result.ok && result.error) notify(result.error);
   };
   const openChat = () => router.push(`/chat/${meetup.id}` as Href);
   const mapUrl = buildMapUrl(meetup.mapQuery || `${meetup.location} ${meetup.district}`);
@@ -281,6 +263,26 @@ export default function MeetupDetailScreen() {
           <AppButton label="Chia bill cho cả bàn" icon="money" onPress={submitBillTotal} />
         </View>
       </BottomSheet>
+
+      <ConfirmDialog
+        visible={leaveDialog}
+        title="Rời kèo này?"
+        message={deposit > 0 ? `Bạn sẽ mất cọc ${deposit.toLocaleString('vi-VN')}đ (demo) chia cho người ở lại.` : 'Bạn sẽ không còn thấy phòng chat của meetup trong danh sách.'}
+        cancelLabel="Ở lại"
+        confirmLabel="Rời kèo"
+        destructive
+        onCancel={() => setLeaveDialog(false)}
+        onConfirm={() => { setLeaveDialog(false); leave(); }}
+      />
+      <ConfirmDialog
+        visible={emergencyDialog}
+        title="Rời khẩn an toàn?"
+        message="Tên bạn sẽ không hiện trong chat. Vị trí quán được gửi cho người thân (demo)."
+        confirmLabel="Rời khẩn"
+        destructive
+        onCancel={() => setEmergencyDialog(false)}
+        onConfirm={runEmergencyLeave}
+      />
     </SafeAreaView>
   );
 }

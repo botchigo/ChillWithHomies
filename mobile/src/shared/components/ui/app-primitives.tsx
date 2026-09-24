@@ -36,6 +36,36 @@ export function BottomSheet({ visible, title, onClose, children }: { visible: bo
   return <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}><View style={styles.modalRoot}><Pressable accessibilityRole="button" accessibilityLabel="Đóng bảng lựa chọn" style={styles.scrim} onPress={onClose} /><SafeAreaView accessibilityViewIsModal edges={['bottom']} style={styles.sheet}><View style={styles.grabber} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>{title}</Text><IconButton icon="close" accessibilityLabel="Đóng" onPress={onClose} /></View>{children}</SafeAreaView></View></Modal>;
 }
 
+export function ConfirmDialog({ visible, title, message, confirmLabel, cancelLabel = 'Hủy', destructive = false, onConfirm, onCancel }: {
+  visible: boolean;
+  title: string;
+  message: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
+      <View style={styles.confirmRoot}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Đóng hộp thoại xác nhận" style={styles.scrim} onPress={onCancel} />
+        <View accessibilityViewIsModal style={styles.confirmCard}>
+          <View style={[styles.confirmIcon, destructive && styles.confirmIconDanger]}>
+            <FontAwesome name={destructive ? 'exclamation-triangle' : 'question'} size={20} color={destructive ? AppColors.danger : AppColors.accent} />
+          </View>
+          <Text accessibilityRole="header" style={styles.confirmTitle}>{title}</Text>
+          <Text style={styles.confirmMessage}>{message}</Text>
+          <View style={styles.confirmActions}>
+            <View style={styles.confirmAction}><AppButton label={cancelLabel} variant="ghost" onPress={onCancel} /></View>
+            <View style={styles.confirmAction}><AppButton label={confirmLabel} variant={destructive ? 'destructive' : 'primary'} onPress={onConfirm} /></View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   button: { minHeight: 54, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, borderWidth: 1 },
   buttonCompact: { minHeight: 40, paddingHorizontal: 16, borderRadius: 13 }, button_primary: { backgroundColor: AppColors.accent, borderColor: AppColors.accent }, button_secondary: { backgroundColor: AppColors.primarySoft, borderColor: '#F6D66B' }, button_ghost: { backgroundColor: AppColors.surface, borderColor: AppColors.border }, button_destructive: { backgroundColor: AppColors.danger, borderColor: AppColors.danger },
@@ -45,4 +75,5 @@ const styles = StyleSheet.create({
   badge: { height: 26, borderRadius: Radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 }, badgeAmber: { backgroundColor: AppColors.primarySoft }, badgeOrange: { backgroundColor: AppColors.accentSoft }, badgeGreen: { backgroundColor: AppColors.successSoft }, badgeNeutral: { backgroundColor: '#F4EFE9' }, badgeText: { fontFamily: FontFamily.bodySemiBold, fontSize: 11, lineHeight: 15 },
   iconButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: AppColors.surface, borderWidth: 1, borderColor: AppColors.border, alignItems: 'center', justifyContent: 'center' }, surfaceCard: { backgroundColor: AppColors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: AppColors.border, ...WarmShadow },
   modalRoot: { flex: 1, justifyContent: 'flex-end' }, scrim: { ...StyleSheet.absoluteFill, backgroundColor: AppColors.overlay }, sheet: { maxHeight: '88%', backgroundColor: AppColors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24 }, grabber: { width: 42, height: 5, borderRadius: 3, backgroundColor: AppColors.border, alignSelf: 'center', marginBottom: 18 }, sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }, sheetTitle: { ...TypeScale.h2, color: AppColors.text },
+  confirmRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }, confirmCard: { width: '100%', maxWidth: 420, alignItems: 'center', padding: 24, borderRadius: Radius.lg, borderWidth: 1, borderColor: AppColors.border, backgroundColor: AppColors.surface, ...WarmShadow }, confirmIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: AppColors.accentSoft }, confirmIconDanger: { backgroundColor: AppColors.dangerSoft }, confirmTitle: { ...TypeScale.h2, color: AppColors.text, textAlign: 'center', marginTop: 16 }, confirmMessage: { ...TypeScale.body, color: AppColors.textSecondary, textAlign: 'center', marginTop: 8 }, confirmActions: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 22 }, confirmAction: { flex: 1 },
 });
